@@ -23,7 +23,7 @@ multi_page()
 # コンテンツ
 ###########################
 st.title("Webアプリの説明")
-
+st.divider()
 ## dfがセッションステートに保存されており、かつ空のファイルではない場合
 if 'df' in st.session_state and st.session_state.df is not None:
     st.write("アップロードした以下のデータに対して分析を実施中です")
@@ -32,6 +32,7 @@ if 'df' in st.session_state and st.session_state.df is not None:
 st.header("csvアップロード📁")
 st.markdown("- このページから、分析に使用するデータをcsv形式でアップロードしてください")
 st.markdown("- アップロード作業を行わないと、他のページで分析をすることができません")
+st.markdown("- 他のページにアクセスしてから**csvアップロード📁**のページに戻ると、csvアップロードを求める画面が再度表示されます\n  - しかし、ホーム画面(本ページ)でdataframeが表示されていれば、そのデータで問題なく分析ができます")
 
 st.header("基礎集計📊")
 st.markdown("- このページでは基本的な統計量やグラフの描画を行うことができます\n  - 1変数の統計量の算出・描画\n  - 2変数の値の関係性")
