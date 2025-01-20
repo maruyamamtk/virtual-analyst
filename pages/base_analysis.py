@@ -78,7 +78,6 @@ else:
 
         # 量的変数に対してはヒストグラムを描画
         st.markdown("### 特定変数の分布")
-        st.divider()
         st.markdown("#### 量的変数")
         selected_numeric_column = st.selectbox(
             "量的変数を選択してください",
@@ -157,7 +156,7 @@ else:
         )
         # 度数分布を丸めた状況と、それに対する箱ひげを同時に描画
         st.markdown(f"### {col1}カラムの要素に対する{col2}の分布の比較")
-        col_left, col_right = st.columns([0.35, 0.65], gap = 'small', vertical_alignment = 'top')
+        col_left, col_right = st.columns([0.4, 0.6], gap = 'small', vertical_alignment = 'top')
         # 度数分布の表示
         with col_left:
             st.markdown("#### カラムの要素とレコード数の関係")
