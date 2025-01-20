@@ -35,13 +35,3 @@ if uploaded_file is not None:
 
     # データをセッションステートに保存
     st.session_state.df = df
-
-    # カラム名を保存
-    # 数値型のカラム名のリスト
-    st.session_state.numeric_columns = df.select_dtypes(include=['number']).columns.tolist()
-
-    # 数値型以外のカラム名のリスト
-    st.session_state.non_numeric_columns = df.select_dtypes(exclude=['number']).columns.tolist()
-
-    st.write("数値型のカラム:", st.session_state.numeric_columns)
-    st.write("数値型以外のカラム:", st.session_state.non_numeric_columns)
