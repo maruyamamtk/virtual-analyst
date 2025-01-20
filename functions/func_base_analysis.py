@@ -61,29 +61,34 @@ def plot_box(df, col1, col2, threshold):
     return fig
 
 # 1つの質的変数ごとに数値の集計を行う
-def agg_1parameter(df, col1, col2, threshold, operation):
+def agg_1parameter(df, col1, col2, threshold):
     # 量的変数の度数分布を集計しておく
     value_counts = colname_counts(df, col1, threshold)
     # 度数分布の割合を基に算出したカテゴリをleft join
     df = pd.merge(df, value_counts[[col1, 'カテゴリ']], on=col1, how="left")
 
-    # operagionごとに指定された集計を実施
-    agg_data = None # 変数の初期化
-    if operation == "合計":
-        agg_data = df.groupby(['カテゴリ'])[col2].sum().reset_index()
-    elif operation == "平均":
-        agg_data = df.groupby(['カテゴリ'])[col2].mean().reset_index()
-    elif operation == "中央値":
-        agg_data = df.groupby(['カテゴリ'])[col2].median().reset_index()
-    elif operation == "最大値":
-        agg_data = df.groupby(['カテゴリ'])[col2].max().reset_index()
-    elif operation == "最小値":
-        agg_data = df.groupby(['カテゴリ'])[col2].min().reset_index()
+    # 指定された集計を実施
+    agg_data_list = [] # 変数の初期化
+    agg_data = df[['カテゴリ']].drop_duplicates()
+    print(agg_data)
+    print('*'*100)
+    # 集計値をリストに追加
+    agg_data_list.append(df.groupby(['カテゴリ'])[col2].count().reset_index().rename(columns={col2:'レコード数'}))
+    agg_data_list.append(df.groupby(['カテゴリ'])[col2].sum().reset_index().rename(columns={col2:'合計'}))
+    agg_data_list.append(df.groupby(['カテゴリ'])[col2].mean().reset_index().rename(columns={col2:'平均値'}))
+    agg_data_list.append(df.groupby(['カテゴリ'])[col2].median().reset_index().rename(columns={col2:'中央値'}))
+    agg_data_list.append(df.groupby(['カテゴリ'])[col2].max().reset_index().rename(columns={col2:'最大値'}))
+    agg_data_list.append(df.groupby(['カテゴリ'])[col2].min().reset_index().rename(columns={col2:'最小値'}))
+    # 集計値を１つのテーブルに集約
+    for df_tmp in agg_data_list:
+        print(df_tmp)
+        agg_data = pd.merge(agg_data, df_tmp, on='カテゴリ', how='left')
 
     # 元のカラム名に戻す
     agg_data = agg_data.rename(columns = {'カテゴリ': col1})
+    agg_data = agg_data[~agg_data[col1].isnull()]
     
-    return agg_data.sort_values(by=col2, ascending=False)
+    return agg_data.sort_values(by='レコード数', ascending=False)
 
 # 質的変数×質的変数
 # ベースとなるクロス集計表を作成

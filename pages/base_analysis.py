@@ -182,13 +182,9 @@ else:
 
         # 質的変数に対して、量的変数の基礎統計量を集計
         st.markdown(f"### {col1}カラムの要素に対する{col2}の集計")
-        operation = st.radio(
-            "集計方法を選択してください",
-            ("合計", "平均", "中央値", "最大値", "最小値")
-        )
 
         # 計算処理
-        result = fba.agg_1parameter(st.session_state.df, col1, col2, threshold/100, operation)
+        result = fba.agg_1parameter(st.session_state.df, col1, col2, threshold/100)
         st.write(result)
 
     ##### 2変数(質的変数×質的変数)の統計量を出力するタブ
