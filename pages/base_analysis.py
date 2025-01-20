@@ -77,9 +77,9 @@ else:
         st.write(st.session_state.df.describe(exclude="number"))
 
         # 量的変数に対してはヒストグラムを描画
-        st.markdown("## 特定変数の分布")
+        st.markdown("### 特定変数の分布")
         st.divider()
-        st.markdown("### 量的変数")
+        st.markdown("#### 量的変数")
         selected_numeric_column = st.selectbox(
             "量的変数を選択してください",
             st.session_state.numeric_columns,
@@ -89,7 +89,7 @@ else:
         st.pyplot(fig_hist, clear_figure=False)
 
         # 質的変数に対してはレコード数をカウントしたdataframeを出力
-        st.markdown("### 質的変数")
+        st.markdown("#### 質的変数")
         selected_non_numeric_column = st.selectbox(
             "質的変数を選択してください",
             st.session_state.non_numeric_columns,
@@ -136,6 +136,7 @@ else:
         st.header("2変数(量的変数×質的変数)")
         st.divider()
         # 描画のパラメータを入力
+        st.markdown("### 描画パラメータの設定")
         col1 = st.selectbox(
             "質的変数を選択してください",
             st.session_state.non_numeric_columns,
@@ -155,10 +156,11 @@ else:
             key="threshold2"
         )
         # 度数分布を丸めた状況と、それに対する箱ひげを同時に描画
+        st.markdown(f"### {col1}カラムの要素に対する{col2}の分布の比較")
         col_left, col_right = st.columns([0.35, 0.65], gap = 'small', vertical_alignment = 'top')
         # 度数分布の表示
         with col_left:
-            st.markdown("### カラムの要素とレコード数の関係")
+            st.markdown("#### カラムの要素とレコード数の関係")
             st.write(f"レコード数の割合が{threshold:.0f}%以下の場合は\n**その他**に丸め処理")
             df_tmp = fba.colname_counts(st.session_state.df, col1)
             df_category = df_tmp[['カテゴリ', 'レコード数', '割合']].groupby('カテゴリ').sum().sort_values(by='レコード数', ascending=False)
@@ -170,14 +172,25 @@ else:
                 "カテゴリ": st.column_config.TextColumn("カラムの値"),
                 "割合": st.column_config.ProgressColumn("レコードの比率", format="%.0f %%", min_value=0, max_value=100)
             }
-            st.write(f"**{col1}カラムの値とレコード数の関係**")
+            st.write(f"**{col1}カラムの要素とレコード数の関係**")
             st.dataframe(df_category, column_config=column_config)
         # 箱ひげ図の描画
         with col_right:   
             if col1 and col2:
-                st.markdown(f"### {col1}の要素に対する{col2}の分布の比較")
+                st.markdown("#### 箱ひげ図による分布の比較")
                 fig_box = fba.plot_box(st.session_state.df, col1, col2, threshold/100)
                 st.pyplot(fig_box, clear_figure=False)
+
+        # 質的変数に対して、量的変数の基礎統計量を集計
+        st.markdown(f"### {col1}カラムの要素に対する{col2}の集計")
+        operation = st.radio(
+            "集計方法を選択してください",
+            ("合計", "平均", "中央値", "最大値", "最小値")
+        )
+
+        # 計算処理
+        result = fba.agg_1parameter(st.session_state.df, col1, col2, threshold/100, operation)
+        st.write(result)
 
     ##### 2変数(質的変数×質的変数)の統計量を出力するタブ
     with tab_list[4]:

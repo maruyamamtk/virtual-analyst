@@ -60,6 +60,31 @@ def plot_box(df, col1, col2, threshold):
     ax.set_ylabel(col2)
     return fig
 
+# 1つの質的変数ごとに数値の集計を行う
+def agg_1parameter(df, col1, col2, threshold, operation):
+    # 量的変数の度数分布を集計しておく
+    value_counts = colname_counts(df, col1, threshold)
+    # 度数分布の割合を基に算出したカテゴリをleft join
+    df = pd.merge(df, value_counts[[col1, 'カテゴリ']], on=col1, how="left")
+
+    # operagionごとに指定された集計を実施
+    agg_data = None # 変数の初期化
+    if operation == "合計":
+        agg_data = df.groupby(['カテゴリ'])[col2].sum().reset_index()
+    elif operation == "平均":
+        agg_data = df.groupby(['カテゴリ'])[col2].mean().reset_index()
+    elif operation == "中央値":
+        agg_data = df.groupby(['カテゴリ'])[col2].median().reset_index()
+    elif operation == "最大値":
+        agg_data = df.groupby(['カテゴリ'])[col2].max().reset_index()
+    elif operation == "最小値":
+        agg_data = df.groupby(['カテゴリ'])[col2].min().reset_index()
+
+    # 元のカラム名に戻す
+    agg_data = agg_data.rename(columns = {'カテゴリ': col1})
+    
+    return agg_data.sort_values(by=col2, ascending=False)
+
 # 質的変数×質的変数
 # ベースとなるクロス集計表を作成
 def cross_counts(df_input, col1, col2, threshold=0.05):
