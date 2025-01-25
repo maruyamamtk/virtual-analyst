@@ -1,7 +1,13 @@
 import streamlit as st
 import pandas as pd
 
+##############################
+#
+# 全ての関数をst.cache_dataによってキャッシュ化し、実行時間の短縮を試みている
+#
+##############################
 
+@st.cache_data
 def coltype_error(target_coltype):
     if target_coltype == '数値型' and not st.session_state.numeric_columns:
         st.error("数値型のカラムが存在しません。", icon=":material/error:")
@@ -15,7 +21,7 @@ def coltype_error(target_coltype):
     else:
         return True
     
-
+@st.cache_data
 def all_null_warning(target_coltype):
     output_flag = True
     if target_coltype == '数値型':

@@ -1,10 +1,18 @@
+import streamlit as st
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import japanize_matplotlib
 
+##############################
+#
+# 全ての関数をst.cache_dataによってキャッシュ化し、実行時間の短縮を試みている
+#
+##############################
+
 ##### 1変数の分布の可視化
 # 数値型のヒストグラム
+@st.cache_data
 def histogram(df, colname):
     fig, ax = plt.subplots()
     sns.histplot(df[colname], kde=True, ax=ax)
@@ -14,6 +22,7 @@ def histogram(df, colname):
     return fig
 
 # 文字列型の度数分布表
+@st.cache_data
 def colname_counts(df, colname, threshold=0.05):
     # 項目ごとに要素の数を数える
     counts = df[colname].value_counts().reset_index()
@@ -30,6 +39,7 @@ def colname_counts(df, colname, threshold=0.05):
 
 ##### 2変数の分布の可視化
 # 相関行列のヒートマップ
+@st.cache_data
 def plot_correlation_heatmap(df):
     corr = df.corr()
     fig, ax = plt.subplots()
@@ -38,6 +48,7 @@ def plot_correlation_heatmap(df):
     return fig
 
 # 数値型×数値型
+@st.cache_data
 def plot_scatter(df, col1, col2):
     fig, ax = plt.subplots()
     sns.scatterplot(x=df[col1], y=df[col2], ax=ax)
@@ -47,6 +58,7 @@ def plot_scatter(df, col1, col2):
     return fig
 
 # 数値型×文字列型
+@st.cache_data
 def plot_box(df, col1, col2, threshold):
     # 数値型の度数分布を集計しておく
     value_counts = colname_counts(df, col1, threshold)
@@ -61,6 +73,7 @@ def plot_box(df, col1, col2, threshold):
     return fig
 
 # 1つの文字列型ごとに数値の集計を行う
+@st.cache_data
 def agg_1parameter(df, col1, col2, threshold):
     # 数値型の度数分布を集計しておく
     value_counts = colname_counts(df, col1, threshold)
@@ -88,6 +101,7 @@ def agg_1parameter(df, col1, col2, threshold):
     return agg_data.sort_values(by='レコード数', ascending=False)
 
 # 時系列の変数を用いて数値を集計する
+@st.cache_data
 def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_numeric):
     df = df_input[[col_datetime, col_numeric]].copy() # 必要カラムのみに絞りこみ
     df.set_index(col_datetime, inplace=True)
@@ -133,6 +147,7 @@ def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_
     return agg_df.reset_index().sort_values(by=col_datetime, ascending=True)
 
 # 時系列に対する1変数の推移の描画
+@st.cache_data
 def plot_datetime_1param(df, col_datetime, col_numeric, plot_type, datetime_type):
      # datetime_typeに応じてdf[col_datetime]のデータの中身を変更
     if datetime_type == '日'  or datetime_type == '週':
@@ -161,6 +176,7 @@ def plot_datetime_1param(df, col_datetime, col_numeric, plot_type, datetime_type
 
 # 文字列型×文字列型
 # ベースとなるクロス集計表を作成
+@st.cache_data
 def cross_counts(df_input, col1, col2, threshold=0.05):
     # st.session_state.dfに直接影響が出ないようコピーを作成
     df = df_input.copy()
@@ -183,6 +199,7 @@ def cross_counts(df_input, col1, col2, threshold=0.05):
     return pivot_table
     
 # heatmapの作成
+@st.cache_data
 def plot_cross_heatmap(df, col1, col2):
     # クロス集計表を出力
     pivot_table = cross_counts(df, col1, col2)
@@ -194,6 +211,7 @@ def plot_cross_heatmap(df, col1, col2):
     return fig
 
 # 積み上げ棒グラフの作成
+@st.cache_data
 def plot_cross_bar(df, col1, col2, normalize):
     # クロス集計表を出力
     pivot_table = cross_counts(df, col1, col2)

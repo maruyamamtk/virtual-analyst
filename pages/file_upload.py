@@ -25,11 +25,17 @@ if 'df' not in st.session_state:
     st.session_state.df = None
 
 st.title("CSVファイルアップローダー")
+
+@st.cache_data
+def load_data(uploaded_file):
+    df = pd.read_csv(uploaded_file)
+    return df
+
 uploaded_file = st.file_uploader("CSVファイルをアップロードしてください", type=["csv"])
 
 if uploaded_file is not None:
     # アップロード結果の可視化
-    df = pd.read_csv(uploaded_file)
+    df = load_data(uploaded_file)
     st.write("アップロードされたデータのサイズ:", df.shape)
     st.dataframe(df)
 
