@@ -26,7 +26,7 @@ st.title("Webアプリの説明")
 st.divider()
 ## dfがセッションステートに保存されており、かつ空のファイルではない場合
 if 'df' in st.session_state and st.session_state.df is not None:
-    st.write("アップロードした以下のデータに対して分析を実施中です")
+    st.write(f"アップロードした以下のデータに対して分析を実施中です(データサイズ: {st.session_state.df.shape})")
     st.dataframe(st.session_state.df.head())
 
 st.header("📁csvアップロード")

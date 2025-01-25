@@ -31,7 +31,7 @@ else:
     st.write(":red[変換できない型を指定すると、そのカラムがnullになってしまうので注意してください]")
     st.write("その場合、ファイルの再アップロードが必要になります")
     for column in st.session_state.df.columns:
-        new_type = st.selectbox(f"{column} の新しいデータ型を選択してください", 
+        new_type = st.selectbox(f"{column} の新しいデータ型を選択してください(現状の型: {st.session_state.df[column].dtypes})", 
                                 options=["そのまま", "数値型", "文字列型", "日付型"], 
                                 index=0)
         # filter機能をリセットした際にカラムの型が元に戻らないように、df_originalも変換する
