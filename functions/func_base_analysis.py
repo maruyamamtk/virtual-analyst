@@ -93,16 +93,7 @@ def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_
     df.set_index(col_datetime, inplace=True)
 
     # datetime_typeに応じて日付カラムの粒度を変更し、agg_typeに基づいて集計
-    if datetime_type == '日':
-        if agg_type == '合計':
-            agg_df = df.resample('D').sum()
-        elif agg_type == '平均':
-            agg_df = df.resample('D').mean()
-        elif agg_type == '中央値':
-            agg_df = df.resample('D').median()
-        elif agg_type == 'カウント':
-            agg_df = df.resample('D').count()
-    elif datetime_type == '月':
+    if datetime_type == '月':
         if agg_type == '合計':
             agg_df = df.resample('M').sum()
         elif agg_type == '平均':
@@ -111,15 +102,24 @@ def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_
             agg_df = df.resample('M').median()
         elif agg_type == 'カウント':
             agg_df = df.resample('M').count()
-    elif datetime_type == '年':
+    elif datetime_type == '週':
         if agg_type == '合計':
-            agg_df = df.resample('Y').sum()
+            agg_df = df.resample('W').sum()
         elif agg_type == '平均':
-            agg_df = df.resample('Y').mean()
+            agg_df = df.resample('W').mean()
         elif agg_type == '中央値':
-            agg_df = df.resample('Y').median()
+            agg_df = df.resample('W').median()
         elif agg_type == 'カウント':
-            agg_df = df.resample('Y').count()
+            agg_df = df.resample('W').count()
+    elif datetime_type == '日':
+        if agg_type == '合計':
+            agg_df = df.resample('D').sum()
+        elif agg_type == '平均':
+            agg_df = df.resample('D').mean()
+        elif agg_type == '中央値':
+            agg_df = df.resample('D').median()
+        elif agg_type == 'カウント':
+            agg_df = df.resample('D').count()
     elif datetime_type == '時間':
         if agg_type == '合計':
             agg_df = df.resample('H').sum()
