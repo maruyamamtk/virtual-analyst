@@ -34,7 +34,8 @@ if uploaded_file is not None:
     st.dataframe(df)
 
     # データをセッションステートに保存
-    st.session_state.df = df
+    st.session_state.df_original = df # 生データ
+    st.session_state.df = df # 分析に使用するデータ(生データを使用するケースも想定してオブジェクトを分ける)
 
     # カラム名を保存
     # 数値型のカラム名のリスト
