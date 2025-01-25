@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import japanize_matplotlib
 
 ##### 1変数の分布の可視化
-# 量的変数のヒストグラム
+# 数値型のヒストグラム
 def histogram(df, colname):
     fig, ax = plt.subplots()
     sns.histplot(df[colname], kde=True, ax=ax)
@@ -13,7 +13,7 @@ def histogram(df, colname):
     ax.set_ylabel('頻度')
     return fig
 
-# 質的変数の度数分布表
+# 文字列型の度数分布表
 def colname_counts(df, colname, threshold=0.05):
     # 項目ごとに要素の数を数える
     counts = df[colname].value_counts().reset_index()
@@ -37,7 +37,7 @@ def plot_correlation_heatmap(df):
     ax.set_title('相関行列のヒートマップ')
     return fig
 
-# 量的変数×量的変数
+# 数値型×数値型
 def plot_scatter(df, col1, col2):
     fig, ax = plt.subplots()
     sns.scatterplot(x=df[col1], y=df[col2], ax=ax)
@@ -46,9 +46,9 @@ def plot_scatter(df, col1, col2):
     ax.set_ylabel(col2)
     return fig
 
-# 量的変数×質的変数
+# 数値型×文字列型
 def plot_box(df, col1, col2, threshold):
-    # 量的変数の度数分布を集計しておく
+    # 数値型の度数分布を集計しておく
     value_counts = colname_counts(df, col1, threshold)
     # 度数分布の割合を基に算出したカテゴリをleft join
     df = pd.merge(df, value_counts[[col1, 'カテゴリ']], on=col1, how="left")
@@ -60,9 +60,9 @@ def plot_box(df, col1, col2, threshold):
     ax.set_ylabel(col2)
     return fig
 
-# 1つの質的変数ごとに数値の集計を行う
+# 1つの文字列型ごとに数値の集計を行う
 def agg_1parameter(df, col1, col2, threshold):
-    # 量的変数の度数分布を集計しておく
+    # 数値型の度数分布を集計しておく
     value_counts = colname_counts(df, col1, threshold)
     # 度数分布の割合を基に算出したカテゴリをleft join
     df = pd.merge(df, value_counts[[col1, 'カテゴリ']], on=col1, how="left")
@@ -70,8 +70,6 @@ def agg_1parameter(df, col1, col2, threshold):
     # 指定された集計を実施
     agg_data_list = [] # 変数の初期化
     agg_data = df[['カテゴリ']].drop_duplicates()
-    print(agg_data)
-    print('*'*100)
     # 集計値をリストに追加
     agg_data_list.append(df.groupby(['カテゴリ'])[col2].count().reset_index().rename(columns={col2:'レコード数'}))
     agg_data_list.append(df.groupby(['カテゴリ'])[col2].sum().reset_index().rename(columns={col2:'合計'}))
@@ -81,7 +79,6 @@ def agg_1parameter(df, col1, col2, threshold):
     agg_data_list.append(df.groupby(['カテゴリ'])[col2].min().reset_index().rename(columns={col2:'最小値'}))
     # 集計値を１つのテーブルに集約
     for df_tmp in agg_data_list:
-        print(df_tmp)
         agg_data = pd.merge(agg_data, df_tmp, on='カテゴリ', how='left')
 
     # 元のカラム名に戻す
@@ -90,7 +87,56 @@ def agg_1parameter(df, col1, col2, threshold):
     
     return agg_data.sort_values(by='レコード数', ascending=False)
 
-# 質的変数×質的変数
+# 時系列の変数を用いて数値を集計する
+def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_numeric):
+    df = df_input[[col_datetime, col_numeric]].copy() # 必要カラムのみに絞りこみ
+    df.set_index(col_datetime, inplace=True)
+
+    # datetime_typeに応じて日付カラムの粒度を変更し、agg_typeに基づいて集計
+    if datetime_type == '日':
+        if agg_type == '合計':
+            agg_df = df.resample('D').sum()
+        elif agg_type == '平均':
+            agg_df = df.resample('D').mean()
+        elif agg_type == '中央値':
+            agg_df = df.resample('D').median()
+        elif agg_type == 'カウント':
+            agg_df = df.resample('D').count()
+    elif datetime_type == '月':
+        if agg_type == '合計':
+            agg_df = df.resample('M').sum()
+        elif agg_type == '平均':
+            agg_df = df.resample('M').mean()
+        elif agg_type == '中央値':
+            agg_df = df.resample('M').median()
+        elif agg_type == 'カウント':
+            agg_df = df.resample('M').count()
+    elif datetime_type == '年':
+        if agg_type == '合計':
+            agg_df = df.resample('Y').sum()
+        elif agg_type == '平均':
+            agg_df = df.resample('Y').mean()
+        elif agg_type == '中央値':
+            agg_df = df.resample('Y').median()
+        elif agg_type == 'カウント':
+            agg_df = df.resample('Y').count()
+    elif datetime_type == '時間':
+        if agg_type == '合計':
+            agg_df = df.resample('H').sum()
+        elif agg_type == '平均':
+            agg_df = df.resample('H').mean()
+        elif agg_type == '中央値':
+            agg_df = df.resample('H').median()
+        elif agg_type == 'カウント':
+            agg_df = df.resample('H').count()
+
+    return agg_df.reset_index().sort_values(by=col_datetime, ascending=True)
+
+# 時系列に対する1変数の推移の描画
+def plot_datetime_1param(df):
+    return df
+
+# 文字列型×文字列型
 # ベースとなるクロス集計表を作成
 def cross_counts(df_input, col1, col2, threshold=0.05):
     # st.session_state.dfに直接影響が出ないようコピーを作成

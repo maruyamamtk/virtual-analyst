@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from functions.multi_pages import multi_page
+import functions.error_messages as em
 
 ###########################
 # ページの設定
@@ -39,19 +40,22 @@ else:
         elif new_type == "日付型":
             st.session_state.df[column] = pd.to_datetime(st.session_state.df[column], errors='coerce')
 
+    # 不適切な変換についてはアラートを出す
+    em.all_null_warning("数値型")
+    em.all_null_warning("文字列型")
+    em.all_null_warning("日付型")
+
     st.write("変換後のデータフレーム:")
     st.write(st.session_state.df)
 
     # カラム名を保存
     # 数値型のカラム名のリスト
     st.session_state.numeric_columns = st.session_state.df.select_dtypes(include=['number']).columns.tolist()
-
     # 日付型のカラム名のリスト
     st.session_state.datetime_columns = st.session_state.df.select_dtypes(include=['datetime']).columns.tolist()
-
-    # 数値型・日付型以外のカラム名のリスト
+    # 文字列型のカラム名のリスト
     st.session_state.non_numeric_columns = st.session_state.df.select_dtypes(exclude=['number', 'datetime']).columns.tolist()
 
     st.write("数値型のカラム:", st.session_state.numeric_columns)
     st.write("日付型のカラム:", st.session_state.datetime_columns)
-    st.write("数値型・日付型以外のカラム:", st.session_state.non_numeric_columns)
+    st.write("文字列型のカラム:", st.session_state.non_numeric_columns)
