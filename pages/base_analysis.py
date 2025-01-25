@@ -30,9 +30,9 @@ else:
     tab_list = st.tabs(
         ["データの概要",
          "1変数の統計量",
-         "2変数(量的変数×量的変数)",
-         "2変数(量的変数×質的変数)",
-         "2変数(質的変数×質的変数)"]
+         "2変数(数値型×数値型)",
+         "2変数(数値型×文字列,日付型)",
+         "2変数(文字列型×文字列型)"]
         )
 
     ##### データの概要を出力するタブ
@@ -70,31 +70,31 @@ else:
         st.header("1変数の統計量")
         st.divider()
         # describe関数の実行結果を出力
-        st.markdown("### 量的変数のサマリ")
+        st.markdown("### 数値型, 日付型の変数のサマリ")
         st.write(st.session_state.df.describe())
 
-        st.markdown("### 質的変数のサマリ")
+        st.markdown("### 文字列型の変数のサマリ")
         st.write(st.session_state.df.describe(exclude="number"))
 
-        # 量的変数に対してはヒストグラムを描画
+        # 数値型に対してはヒストグラムを描画
         st.markdown("### 特定変数の分布")
-        st.markdown("#### 量的変数")
+        st.markdown("#### 数値型")
         selected_numeric_column = st.selectbox(
-            "量的変数を選択してください",
+            "数値型の変数を選択してください",
             st.session_state.numeric_columns,
             key="numeric_column1"
         )
         fig_hist = fba.histogram(st.session_state.df, selected_numeric_column)
         st.pyplot(fig_hist, clear_figure=False)
 
-        # 質的変数に対してはレコード数をカウントしたdataframeを出力
-        st.markdown("#### 質的変数")
+        # 文字列型に対してはレコード数をカウントしたdataframeを出力
+        st.markdown("#### 文字列型, 日付型")
         selected_non_numeric_column = st.selectbox(
-            "質的変数を選択してください",
+            "文字列型, 日付型の変数の中から1つの変数を選択してください",
             st.session_state.non_numeric_columns,
             key="non_numeric_column1"
         )
-        st.write(f"選択された質的変数: {selected_non_numeric_column}")
+        st.write(f"選択された変数: {selected_non_numeric_column}")
         df_count = fba.colname_counts(st.session_state.df, selected_non_numeric_column)
         df_count['割合'] = df_count['割合'] * 100 # 割合を0~100%に対する比率に変換
         column_config = {
@@ -104,9 +104,9 @@ else:
         st.dataframe(df_count[[selected_non_numeric_column, 'レコード数', '割合']]
                      ,column_config=column_config)
 
-    ##### 2変数(量的変数×量的変数)の統計量を出力するタブ
+    ##### 2変数(数値型×数値型)の統計量を出力するタブ
     with tab_list[2]:
-        st.header("2変数(量的変数×量的変数)")
+        st.header("2変数(数値型×数値型)")
         st.divider()
         st.markdown("### 相関行列")
         filtered_df = st.session_state.df[st.session_state.numeric_columns]
@@ -116,12 +116,12 @@ else:
         st.markdown("### 散布図")
         # 散布図のパラメータを入力
         col1 = st.selectbox(
-            "1つ目の量的変数を選択してください",
+            "1つ目の変数を選択してください",
             st.session_state.numeric_columns,
             key="numeric_column2"
         )
         col2 = st.selectbox(
-            "2つ目の量的変数を選択してください",
+            "2つ目の変数を選択してください",
             st.session_state.numeric_columns,
             key="numeric_column3"
         )
@@ -130,24 +130,24 @@ else:
             st.pyplot(fig_scatter, clear_figure=False)
 
 
-    ##### 2変数(量的変数×質的変数)の統計量を出力するタブ
+    ##### 2変数(数値型×文字列型)の統計量を出力するタブ
     with tab_list[3]:
-        st.header("2変数(量的変数×質的変数)")
+        st.header("2変数(数値型×文字列型)")
         st.divider()
         # 描画のパラメータを入力
         st.markdown("### 描画パラメータの設定")
         col1 = st.selectbox(
-            "質的変数を選択してください",
+            "文字列型の変数を選択してください",
             st.session_state.non_numeric_columns,
             key="non_numeric_column2"
         )
         col2 = st.selectbox(
-            "量的変数を選択してください",
+            "数値型の変数を選択してください",
             st.session_state.numeric_columns,
             key="numeric_column4"
         )
         threshold = st.number_input(
-            "質的変数において、特定の要素と一致するレコード数が指定割合よりも小さい場合は、**その他**に丸めて集計をします(単位: %)",
+            "文字列型の変数において、特定の要素と一致するレコード数が指定割合よりも小さい場合は、**その他**に丸めて集計をします(単位: %)",
             min_value=0.0,
             max_value=100.0,
             value=5.0,
@@ -180,26 +180,26 @@ else:
                 fig_box = fba.plot_box(st.session_state.df, col1, col2, threshold/100)
                 st.pyplot(fig_box, clear_figure=False)
 
-        # 質的変数に対して、量的変数の基礎統計量を集計
+        # 文字列型に対して、数値型の基礎統計量を集計
         st.markdown(f"### {col1}カラムの要素に対する{col2}の集計")
 
         # 計算処理
         result = fba.agg_1parameter(st.session_state.df, col1, col2, threshold/100)
         st.write(result)
 
-    ##### 2変数(質的変数×質的変数)の統計量を出力するタブ
+    ##### 2変数(文字列型×文字列型)の統計量を出力するタブ
     with tab_list[4]:
-        st.header("2変数(質的変数×質的変数)")
+        st.header("2変数(文字列型×文字列型)")
         st.divider()
         st.write("各カラムにおいて、レコード数の割合が5%以下の場合は**その他**に丸め処理して集計する")
         # 描画のパラメータを入力
         col1 = st.selectbox(
-            "質的変数を選択してください",
+            "1つ目の変数を選択してください",
             st.session_state.non_numeric_columns,
             key="non_numeric_column3"
         )
         col2 = st.selectbox(
-            "質的変数を選択してください",
+            "2つ目の変数を選択してください",
             st.session_state.non_numeric_columns,
             key="non_numeric_column4"
         )
