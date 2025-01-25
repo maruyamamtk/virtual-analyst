@@ -72,10 +72,12 @@ else:
         st.divider()
         # describe関数の実行結果を出力
         st.markdown("### 数値型, 日付型の変数のサマリ")
-        st.write(st.session_state.df.describe())
+        if em.coltype_error("数値型") or em.coltype_error("日付型"):
+            st.write(st.session_state.df.describe(exclude="object"))
 
         st.markdown("### 文字列型の変数のサマリ")
-        st.write(st.session_state.df.describe(include="object"))
+        if em.coltype_error("文字列型"):
+            st.write(st.session_state.df.describe(include="object"))
 
         # 数値型に対してはヒストグラムを描画
         st.markdown("### 特定変数の分布")
@@ -228,8 +230,16 @@ else:
                 )
 
                 # 描画の実施
-                st.markdown(f"### {datetime_type}単位での{col2}の推移")
+                st.markdown(f"### {datetime_type}単位での{col2}の{agg_type}の推移")
+                # 必要なデータを集計
                 agg_df = fba.agg_datetime_dataframe(st.session_state.df, datetime_type, agg_type, col1, col2)
+                plot_type = st.selectbox(
+                    "描画方法を選択してください",
+                    ["棒グラフ", "折れ線グラフ"],
+                    key="plot_type"
+                )
+                fig_datetime_1param = fba.plot_datetime_1param(agg_df, col1, col2, plot_type, datetime_type)
+                st.pyplot(fig_datetime_1param, clear_figure=False)
                 st.dataframe(agg_df)
 
 

@@ -133,8 +133,31 @@ def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_
     return agg_df.reset_index().sort_values(by=col_datetime, ascending=True)
 
 # 時系列に対する1変数の推移の描画
-def plot_datetime_1param(df):
-    return df
+def plot_datetime_1param(df, col_datetime, col_numeric, plot_type, datetime_type):
+     # datetime_typeに応じてdf[col_datetime]のデータの中身を変更
+    if datetime_type == '日'  or datetime_type == '週':
+        df[col_datetime] = df[col_datetime].dt.strftime('%Y-%m-%d')
+    elif datetime_type == '月':
+        df[col_datetime] = df[col_datetime].dt.strftime('%Y-%m')
+    elif datetime_type == '時間':
+        df[col_datetime] = df[col_datetime].dt.strftime('%m-%d %H')
+
+    fig, ax = plt.subplots()
+    # plot_typeに応じてグラフを描き分ける
+    if plot_type == '棒グラフ':
+        df.plot(kind='bar', x=col_datetime, y=col_numeric, ax=ax)
+    elif plot_type == '折れ線グラフ':
+        df.plot(kind='line', x=col_datetime, y=col_numeric, ax=ax)
+    else:
+        raise ValueError("plot_typeは'棒グラフ'または'折れ線グラフ'のいずれかである必要があります。")
+
+    ax.set_title(f'{col_datetime}に対する{col_numeric}の{plot_type}')
+    ax.set_xlabel(col_datetime)
+    ax.set_ylabel(col_numeric + "の集計値")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    return fig
 
 # 文字列型×文字列型
 # ベースとなるクロス集計表を作成
