@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from functions.multi_pages import multi_page
 import functions.func_base_analysis as fba
+import functions.error_messages as em
 
 ###########################
 # ページの設定
@@ -74,143 +75,189 @@ else:
         st.write(st.session_state.df.describe())
 
         st.markdown("### 文字列型の変数のサマリ")
-        st.write(st.session_state.df.describe(exclude="number"))
+        st.write(st.session_state.df.describe(include="object"))
 
         # 数値型に対してはヒストグラムを描画
         st.markdown("### 特定変数の分布")
         st.markdown("#### 数値型")
-        selected_numeric_column = st.selectbox(
-            "数値型の変数を選択してください",
-            st.session_state.numeric_columns,
-            key="numeric_column1"
-        )
-        fig_hist = fba.histogram(st.session_state.df, selected_numeric_column)
-        st.pyplot(fig_hist, clear_figure=False)
+        if em.coltype_error("数値型"):
+            selected_numeric_column = st.selectbox(
+                "数値型の変数を選択してください",
+                st.session_state.numeric_columns,
+                key="numeric_column_tab1"
+            )
+            fig_hist = fba.histogram(st.session_state.df, selected_numeric_column)
+            st.pyplot(fig_hist, clear_figure=False)
 
         # 文字列型に対してはレコード数をカウントしたdataframeを出力
         st.markdown("#### 文字列型, 日付型")
-        selected_non_numeric_column = st.selectbox(
-            "文字列型, 日付型の変数の中から1つの変数を選択してください",
-            st.session_state.non_numeric_columns,
-            key="non_numeric_column1"
-        )
-        st.write(f"選択された変数: {selected_non_numeric_column}")
-        df_count = fba.colname_counts(st.session_state.df, selected_non_numeric_column)
-        df_count['割合'] = df_count['割合'] * 100 # 割合を0~100%に対する比率に変換
-        column_config = {
-            # 割合を0~100%に対する比率で表示
-            "割合": st.column_config.ProgressColumn("レコードの比率", format="%.0f %%", min_value=0, max_value=100)
-        }
-        st.dataframe(df_count[[selected_non_numeric_column, 'レコード数', '割合']]
-                     ,column_config=column_config)
+        if em.coltype_error("文字列型") or em.coltype_error("日付型"):
+            selected_non_numeric_column = st.selectbox(
+                "文字列型, 日付型の変数の中から1つの変数を選択してください",
+                st.session_state.non_numeric_columns + st.session_state.datetime_columns,
+                key="non_numeric_column_tab1"
+            )
+            st.write(f"選択された変数: {selected_non_numeric_column}")
+            df_count = fba.colname_counts(st.session_state.df, selected_non_numeric_column)
+            df_count['割合'] = df_count['割合'] * 100 # 割合を0~100%に対する比率に変換
+            column_config = {
+                # 割合を0~100%に対する比率で表示
+                "割合": st.column_config.ProgressColumn("レコードの比率", format="%.0f %%", min_value=0, max_value=100)
+            }
+            st.dataframe(df_count[[selected_non_numeric_column, 'レコード数', '割合']]
+                        ,column_config=column_config)
 
     ##### 2変数(数値型×数値型)の統計量を出力するタブ
     with tab_list[2]:
         st.header("2変数(数値型×数値型)")
         st.divider()
-        st.markdown("### 相関行列")
-        filtered_df = st.session_state.df[st.session_state.numeric_columns]
-        fig_corr = fba.plot_correlation_heatmap(filtered_df)
-        st.pyplot(fig_corr, clear_figure=False)
+        if em.coltype_error("数値型"):
+            st.markdown("### 相関行列")
+            filtered_df = st.session_state.df[st.session_state.numeric_columns]
+            fig_corr = fba.plot_correlation_heatmap(filtered_df)
+            st.pyplot(fig_corr, clear_figure=False)
 
-        st.markdown("### 散布図")
-        # 散布図のパラメータを入力
-        col1 = st.selectbox(
-            "1つ目の変数を選択してください",
-            st.session_state.numeric_columns,
-            key="numeric_column2"
-        )
-        col2 = st.selectbox(
-            "2つ目の変数を選択してください",
-            st.session_state.numeric_columns,
-            key="numeric_column3"
-        )
-        if col1 and col2:
-            fig_scatter = fba.plot_scatter(st.session_state.df, col1, col2)
-            st.pyplot(fig_scatter, clear_figure=False)
-
-
-    ##### 2変数(数値型×文字列型)の統計量を出力するタブ
-    with tab_list[3]:
-        st.header("2変数(数値型×文字列型)")
-        st.divider()
-        # 描画のパラメータを入力
-        st.markdown("### 描画パラメータの設定")
-        col1 = st.selectbox(
-            "文字列型の変数を選択してください",
-            st.session_state.non_numeric_columns,
-            key="non_numeric_column2"
-        )
-        col2 = st.selectbox(
-            "数値型の変数を選択してください",
-            st.session_state.numeric_columns,
-            key="numeric_column4"
-        )
-        threshold = st.number_input(
-            "文字列型の変数において、特定の要素と一致するレコード数が指定割合よりも小さい場合は、**その他**に丸めて集計をします(単位: %)",
-            min_value=0.0,
-            max_value=100.0,
-            value=5.0,
-            step=5.0,
-            key="threshold2"
-        )
-        # 度数分布を丸めた状況と、それに対する箱ひげを同時に描画
-        st.markdown(f"### {col1}カラムの要素に対する{col2}の分布の比較")
-        col_left, col_right = st.columns([0.4, 0.6], gap = 'small', vertical_alignment = 'top')
-        # 度数分布の表示
-        with col_left:
-            st.markdown("#### カラムの要素とレコード数の関係")
-            st.write(f"レコード数の割合が{threshold:.0f}%以下の場合は\n**その他**に丸め処理")
-            df_tmp = fba.colname_counts(st.session_state.df, col1)
-            df_category = df_tmp[['カテゴリ', 'レコード数', '割合']].groupby('カテゴリ').sum().sort_values(by='レコード数', ascending=False)
-            
-            # 表示用にデータを加工
-            df_category["割合"] = df_category["割合"]*100
-            column_config = {
-                # 割合を0~100%に対する比率で表示
-                "カテゴリ": st.column_config.TextColumn("カラムの値"),
-                "割合": st.column_config.ProgressColumn("レコードの比率", format="%.0f %%", min_value=0, max_value=100)
-            }
-            st.write(f"**{col1}カラムの要素とレコード数の関係**")
-            st.dataframe(df_category, column_config=column_config)
-        # 箱ひげ図の描画
-        with col_right:   
+            st.markdown("### 散布図")
+            # 散布図のパラメータを入力
+            col1 = st.selectbox(
+                "1つ目の変数を選択してください",
+                st.session_state.numeric_columns,
+                key="numeric_column_tab2_0"
+            )
+            col2 = st.selectbox(
+                "2つ目の変数を選択してください",
+                st.session_state.numeric_columns,
+                key="numeric_column_tab2_1"
+            )
             if col1 and col2:
-                st.markdown("#### 箱ひげ図による分布の比較")
-                fig_box = fba.plot_box(st.session_state.df, col1, col2, threshold/100)
-                st.pyplot(fig_box, clear_figure=False)
+                fig_scatter = fba.plot_scatter(st.session_state.df, col1, col2)
+                st.pyplot(fig_scatter, clear_figure=False)
 
-        # 文字列型に対して、数値型の基礎統計量を集計
-        st.markdown(f"### {col1}カラムの要素に対する{col2}の集計")
 
-        # 計算処理
-        result = fba.agg_1parameter(st.session_state.df, col1, col2, threshold/100)
-        st.write(result)
+    ##### 2変数(数値型×文字列,日付型)の統計量を出力するタブ
+    with tab_list[3]:
+        st.header("2変数(数値型×文字列,日付型)")
+        st.divider()
+
+        # 内部にtabを作成
+        tab_list_3 = st.tabs(
+            ["文字列型の場合",
+            "日付型の場合"]
+        )
+        # 文字列型の場合の描画を実行
+        with tab_list_3[0]:
+            # 描画のパラメータを入力
+            st.markdown("### 描画パラメータの設定")
+            if em.coltype_error("文字列型") and em.coltype_error("数値型"):
+                col1 = st.selectbox(
+                    "文字列型の変数を選択してください",
+                    st.session_state.non_numeric_columns,
+                    key="non_numeric_column_tab3_0"
+                )
+                col2 = st.selectbox(
+                    "数値型の変数を選択してください",
+                    st.session_state.numeric_columns,
+                    key="numeric_column_tab3_0"
+                )
+
+                threshold = st.number_input(
+                    "文字列型の変数において、特定の要素と一致するレコード数が指定割合よりも小さい場合は、**その他**に丸めて集計をします(単位: %)",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=5.0,
+                    step=5.0,
+                    key="threshold2"
+                )
+                # 度数分布を丸めた状況と、それに対する箱ひげを同時に描画
+                st.markdown(f"### {col1}カラムの要素に対する{col2}の分布の比較")
+                col_left, col_right = st.columns([0.4, 0.6], gap = 'small', vertical_alignment = 'top')
+                # 度数分布の表示
+                with col_left:
+                    st.markdown("#### カラムの要素とレコード数の関係")
+                    st.write(f"レコード数の割合が{threshold:.0f}%以下の場合は\n**その他**に丸め処理")
+                    df_tmp = fba.colname_counts(st.session_state.df, col1)
+                    df_category = df_tmp[['カテゴリ', 'レコード数', '割合']].groupby('カテゴリ').sum().sort_values(by='レコード数', ascending=False)
+                    
+                    # 表示用にデータを加工
+                    df_category["割合"] = df_category["割合"]*100
+                    column_config = {
+                        # 割合を0~100%に対する比率で表示
+                        "カテゴリ": st.column_config.TextColumn("カラムの値"),
+                        "割合": st.column_config.ProgressColumn("レコードの比率", format="%.0f %%", min_value=0, max_value=100)
+                    }
+                    st.write(f"**{col1}カラムの要素とレコード数の関係**")
+                    st.dataframe(df_category, column_config=column_config)
+                # 箱ひげ図の描画
+                with col_right:   
+                    if col1 and col2:
+                        st.markdown("#### 箱ひげ図による分布の比較")
+                        fig_box = fba.plot_box(st.session_state.df, col1, col2, threshold/100)
+                        st.pyplot(fig_box, clear_figure=False)
+
+                # 文字列型に対して、数値型の基礎統計量を集計
+                st.markdown(f"### {col1}カラムの要素に対する{col2}の集計")
+
+                # 計算処理
+                result = fba.agg_1parameter(st.session_state.df, col1, col2, threshold/100)
+                st.write(result)
+
+        # 日付型の場合の描画を実行
+        with tab_list_3[1]:
+            # 描画のパラメータを入力
+            st.markdown("### 描画パラメータの設定")
+            if em.coltype_error("日付型") and em.coltype_error("数値型"):
+                col1 = st.selectbox(
+                    "日付型の変数を選択してください",
+                    st.session_state.datetime_columns,
+                    key="datetime_column_tab3_1"
+                )
+                col2 = st.selectbox(
+                    "数値型の変数を選択してください",
+                    st.session_state.numeric_columns,
+                    key="numeric_column_tab3_1"
+                )
+                datetime_type = st.selectbox(
+                    "集計時における日付カラムの粒度を選択してください",
+                    ["月", "週", "日", "時間"],
+                    key="datetime_type"
+                )
+                agg_type = st.selectbox(
+                    "集計時の指標を選択してください",
+                    ["合計", "平均", "中央値", "カウント"],
+                    key="agg_type"
+                )
+
+                # 描画の実施
+                st.markdown(f"### {datetime_type}単位での{col2}の推移")
+                agg_df = fba.agg_datetime_dataframe(st.session_state.df, datetime_type, agg_type, col1, col2)
+                st.dataframe(agg_df)
+
 
     ##### 2変数(文字列型×文字列型)の統計量を出力するタブ
     with tab_list[4]:
         st.header("2変数(文字列型×文字列型)")
         st.divider()
-        st.write("各カラムにおいて、レコード数の割合が5%以下の場合は**その他**に丸め処理して集計する")
-        # 描画のパラメータを入力
-        col1 = st.selectbox(
-            "1つ目の変数を選択してください",
-            st.session_state.non_numeric_columns,
-            key="non_numeric_column3"
-        )
-        col2 = st.selectbox(
-            "2つ目の変数を選択してください",
-            st.session_state.non_numeric_columns,
-            key="non_numeric_column4"
-        )
+        if em.coltype_error("文字列型"):
+            st.write("各カラムにおいて、レコード数の割合が5%以下の場合は**その他**に丸め処理して集計する")
+            # 描画のパラメータを入力
+            col1 = st.selectbox(
+                "1つ目の変数を選択してください",
+                st.session_state.non_numeric_columns,
+                key="non_numeric_column_tab4_0"
+            )
+            col2 = st.selectbox(
+                "2つ目の変数を選択してください",
+                st.session_state.non_numeric_columns,
+                key="non_numeric_column_tab4_1"
+            )
 
-        if col1 and col2:
-            # ヒートマップを描画
-            st.markdown("### 2カラム選定時のクロス集計表")
-            fig_cross_heatmap = fba.plot_cross_heatmap(st.session_state.df, col1, col2)
-            st.pyplot(fig_cross_heatmap, clear_figure=False)
-            # 積み上げ棒グラフを描画
-            st.markdown("### 2カラム選定時の積み上げ棒グラフ")
-            normalize = st.checkbox('実数ではなく割合で描画する', value=False)
-            fig_cross_bar = fba.plot_cross_bar(st.session_state.df, col1, col2, normalize)
-            st.pyplot(fig_cross_bar, clear_figure=False)
+            if col1 and col2:
+                # ヒートマップを描画
+                st.markdown("### 2カラム選定時のクロス集計表")
+                fig_cross_heatmap = fba.plot_cross_heatmap(st.session_state.df, col1, col2)
+                st.pyplot(fig_cross_heatmap, clear_figure=False)
+                # 積み上げ棒グラフを描画
+                st.markdown("### 2カラム選定時の積み上げ棒グラフ")
+                normalize = st.checkbox('実数ではなく割合で描画する', value=False)
+                fig_cross_bar = fba.plot_cross_bar(st.session_state.df, col1, col2, normalize)
+                st.pyplot(fig_cross_bar, clear_figure=False)
