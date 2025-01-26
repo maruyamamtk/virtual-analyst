@@ -149,7 +149,7 @@ def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_
 # 時系列に対する1変数の推移の描画
 @st.cache_data
 def plot_datetime_1param(df, col_datetime, col_numeric, plot_type, datetime_type):
-     # datetime_typeに応じてdf[col_datetime]のデータの中身を変更
+    # datetime_typeに応じてdf[col_datetime]のデータの中身を変更
     if datetime_type == '日'  or datetime_type == '週':
         df[col_datetime] = df[col_datetime].dt.strftime('%Y-%m-%d')
     elif datetime_type == '月':
@@ -229,4 +229,153 @@ def plot_cross_bar(df, col1, col2, normalize):
     ax.set_ylabel('割合' if normalize else '要素数')
     ax.legend(title=col2)
     
+    return fig
+
+# 3変数の集計
+# 日付×日付ごとにクロス集計
+@st.cache_data
+def agg_datetime_2col_dataframe(df_input, datetime_type1, datetime_type2,
+                                agg_type, col_datetime1, col_datetime2, col_numeric):
+    df = df_input[[col_datetime1, col_datetime2, col_numeric]].copy()  # 必要カラムのみに絞りこみ
+
+    # datetime_type1に応じて日付カラムの粒度を変更
+    if datetime_type1 == '日':
+        df[col_datetime1] = df[col_datetime1].dt.date
+    elif datetime_type1 == '月':
+        df[col_datetime1] = df[col_datetime1].dt.to_period('M').dt.to_timestamp()
+    elif datetime_type1 == '週':
+        df[col_datetime1] = df[col_datetime1].dt.to_period('W').dt.to_timestamp()
+    elif datetime_type1 == '時間':
+        df[col_datetime1] = df[col_datetime1].dt.floor('H')
+    # datetime_type2に応じて日付カラムの粒度を変更
+    if datetime_type2 == '日':
+        df[col_datetime2] = df[col_datetime2].dt.date
+    elif datetime_type2 == '月':
+        df[col_datetime2] = df[col_datetime2].dt.to_period('M').dt.to_timestamp()
+    elif datetime_type2 == '週':
+        df[col_datetime2] = df[col_datetime2].dt.to_period('W').dt.to_timestamp()
+    elif datetime_type2 == '時間':
+        df[col_datetime2] = df[col_datetime2].dt.floor('H')
+
+    # 集計
+    if agg_type == '合計':
+        agg_df = df.groupby([col_datetime1, col_datetime2])[col_numeric].sum().reset_index()
+    elif agg_type == '平均':
+        agg_df = df.groupby([col_datetime1, col_datetime2])[col_numeric].mean().reset_index()
+    elif agg_type == '中央値':
+        agg_df = df.groupby([col_datetime1, col_datetime2])[col_numeric].median().reset_index()
+    elif agg_type == 'カウント':
+        agg_df = df.groupby([col_datetime1, col_datetime2])[col_numeric].count().reset_index()
+
+    # datetime_type1に応じてdf[col_datetime]のデータの中身を変更
+    if datetime_type1 == '日'  or datetime_type1 == '週':
+        agg_df[col_datetime1] = agg_df[col_datetime1].dt.strftime('%Y-%m-%d')
+    elif datetime_type1 == '月':
+        agg_df[col_datetime1] = agg_df[col_datetime1].dt.strftime('%Y-%m')
+    elif datetime_type1 == '時間':
+        agg_df[col_datetime1] = agg_df[col_datetime1].dt.strftime('%m-%d %H')
+    # datetime_type2に応じてdf[col_datetime]のデータの中身を変更
+    if datetime_type2 == '日'  or datetime_type2 == '週':
+        agg_df[col_datetime2] = agg_df[col_datetime2].dt.strftime('%Y-%m-%d')
+    elif datetime_type2 == '月':
+        agg_df[col_datetime2] = agg_df[col_datetime2].dt.strftime('%Y-%m')
+    elif datetime_type2 == '時間':
+        agg_df[col_datetime2] = agg_df[col_datetime2].dt.strftime('%m-%d %H')
+
+    # アウトプット用にデータを整形
+    agg_df = agg_df.sort_values(by=[col_datetime1, col_datetime2], ascending=True)
+    agg_df = pd.pivot(agg_df, index=col_datetime1, columns=col_datetime2, values=col_numeric)
+    return agg_df
+
+# 文字列型×文字列型ごとにクロス集計
+@st.cache_data
+def agg_category_2col_dataframe(df_input, col1, col2, col_numeric, agg_type, threshold1=0.05, threshold2=0.05):
+    # st.session_state.dfに直接影響が出ないようコピーを作成
+    df = df_input.copy()
+    
+    # col1, col2に対して「その他」というカテゴリを与える(度数分布がthreshold以下)
+    counts_col1 = colname_counts(df, col1, threshold1)
+    df['カテゴリ1'] = df[col1].map(counts_col1.set_index(col1)['カテゴリ'])
+    counts_col2 = colname_counts(df, col2, threshold1)
+    df['カテゴリ2'] = df[col2].map(counts_col2.set_index(col2)['カテゴリ'])
+
+    # 必要なカラムだけ抽出
+    df = df[['カテゴリ1', 'カテゴリ2', col_numeric]]
+    # agg_typeに応じて集計を実施
+    if agg_type == '合計':
+        agg_df = df.groupby(['カテゴリ1', 'カテゴリ2'])[col_numeric].sum().reset_index()
+    elif agg_type == '平均':
+        agg_df = df.groupby(['カテゴリ1', 'カテゴリ2'])[col_numeric].mean().reset_index()
+    elif agg_type == '中央値':
+        agg_df = df.groupby(['カテゴリ1', 'カテゴリ2'])[col_numeric].median().reset_index()
+    elif agg_type == 'カウント':
+        agg_df = df.groupby(['カテゴリ1', 'カテゴリ2'])[col_numeric].count().reset_index()
+
+    agg_df = agg_df.sort_values(by=['カテゴリ1', 'カテゴリ2'], ascending=True)
+    agg_df = pd.pivot(agg_df, index='カテゴリ1', columns='カテゴリ2', values=col_numeric)
+    return agg_df
+
+# 文字列型×日付型ごとにクロス集計
+@st.cache_data
+def agg_category_datetime_dataframe(df_input, col_category, col_datetime, col_numeric,
+                                                        agg_type, threshold_input, datetime_type_input):
+    # st.session_state.dfに直接影響が出ないようコピーを作成
+    df = df_input.copy()
+
+    # col_categoryに対して「その他」というカテゴリを与える(度数分布がthreshold_input以下)
+    counts_col1 = colname_counts(df, col_category, threshold_input)
+    df['カテゴリ'] = df[col_category].map(counts_col1.set_index(col_category)['カテゴリ'])
+
+    # datetime_type_inputに応じて日付カラムの粒度を変更
+    if datetime_type_input == '日':
+        df[col_datetime] = df[col_datetime].dt.date
+    elif datetime_type_input == '月':
+        df[col_datetime] = df[col_datetime].dt.to_period('M').dt.to_timestamp()
+    elif datetime_type_input == '週':
+        df[col_datetime] = df[col_datetime].dt.to_period('W').dt.to_timestamp()
+    elif datetime_type_input == '時間':
+        df[col_datetime] = df[col_datetime].dt.floor('H')
+
+    # 集計
+    if agg_type == '合計':
+        agg_df = df.groupby([col_datetime, 'カテゴリ'])[col_numeric].sum().reset_index()
+    elif agg_type == '平均':
+        agg_df = df.groupby([col_datetime, 'カテゴリ'])[col_numeric].mean().reset_index()
+    elif agg_type == '中央値':
+        agg_df = df.groupby([col_datetime, 'カテゴリ'])[col_numeric].median().reset_index()
+    elif agg_type == 'カウント':
+        agg_df = df.groupby([col_datetime, 'カテゴリ'])[col_numeric].count().reset_index()
+    
+    # datetime_type_inputに応じてdf[col_datetime]のデータの中身を変更
+    if datetime_type_input == '日'  or datetime_type_input == '週':
+        agg_df[col_datetime] = agg_df[col_datetime].dt.strftime('%Y-%m-%d')
+    elif datetime_type_input == '月':
+        agg_df[col_datetime] = agg_df[col_datetime].dt.strftime('%Y-%m')
+    elif datetime_type_input == '時間':
+        agg_df[col_datetime] = agg_df[col_datetime].dt.strftime('%m-%d %H')
+
+    agg_df = agg_df.sort_values(by=[col_datetime, 'カテゴリ'], ascending=True)
+    agg_df = pd.pivot(agg_df, index=col_datetime, columns='カテゴリ', values=col_numeric)
+    return agg_df
+
+# 3変数を用いた時系列プロット
+@st.cache_data
+def plot_date_category_3val(df, col_numeric, col_timeline, col_category, agg_type):
+    # 欠損値は0を補完する
+    df = df.fillna(0)
+
+    fig, ax = plt.subplots()
+
+    # 各カテゴリごとにプロット
+    for category in df.columns:
+        ax.plot(df.index, df[category], label=category)
+
+    ax.set_title(f'日付に対する{col_category}毎の{col_numeric}の{agg_type}の推移')
+    ax.set_xlabel(col_timeline)
+    ax.set_ylabel(col_numeric)
+    # 凡例をグラフの枠の外側（右側）に配置
+    ax.legend(title=col_category, bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
     return fig

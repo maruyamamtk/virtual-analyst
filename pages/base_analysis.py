@@ -33,7 +33,8 @@ else:
          "1変数の統計量",
          "2変数(数値型×数値型)",
          "2変数(数値型×文字列,日付型)",
-         "2変数(文字列型×文字列型)"]
+         "2変数(文字列型×文字列型)",
+         "3変数"]
         )
 
     ##### データの概要を出力するタブ
@@ -247,7 +248,7 @@ else:
                         key="datetime_type"
                     )
                     agg_type = st.selectbox(
-                        "集計時の指標を選択してください",
+                        "集計における計算方法を選択してください",
                         ["合計", "平均", "中央値", "カウント"],
                         key="agg_type"
                     )
@@ -301,3 +302,156 @@ else:
                     st.pyplot(fig_cross_bar, clear_figure=False)
 
             plot_tab4_crosstab()
+
+
+    ##### 3変数の関係性を集計するタブ
+    with tab_list[5]:
+        st.header("3変数の集計")
+        #st.write("各カラムにおいて、レコード数の割合が5%以下の場合は**その他**に丸め処理して集計する")
+        st.divider()
+        if em.coltype_error("数値型") and (em.coltype_error("文字列型") or em.coltype_error("日付型")):
+            @st.fragment
+            def plot_tab5_timeline():
+                ##### 描画のパラメータを入力
+                st.markdown("### 描画パラメータの設定")
+                with st.expander("**数値型の変数の選択**"):
+                    col_numeric = st.selectbox(
+                        "集計対象の数値型の変数を選択してください",
+                        st.session_state.numeric_columns,
+                        key="numeric_column_tab5"
+                    )
+                    agg_type = st.selectbox(
+                            "集計における計算方法を選択してください",
+                            ["合計", "平均", "中央値", "カウント"],
+                            key="agg_type_tab5"
+                    )
+                with st.expander("**集計時のディメンションの選択(その1)**"):
+                    # ディメンション(1つ目)
+                    col_dim1 = st.selectbox(
+                        "1つ目のディメンション(文字列型or日付型の変数)を選択してください",
+                        st.session_state.non_numeric_columns + st.session_state.datetime_columns,
+                        key="non_numeric_column_tab5_1"
+                    )
+                    # dimの選択肢毎に前処理を実施
+                    if col_dim1 in st.session_state.datetime_columns:
+                        datetime_type1 = st.selectbox(
+                            "集計時における日付カラムの粒度を選択してください",
+                            ["月", "週", "日", "時間"],
+                            key="datetime_type_tab5_1"
+                        )
+                    elif col_dim1 in st.session_state.non_numeric_columns:
+                        threshold1 = st.number_input(
+                            "文字列型の変数において、特定の要素と一致するレコード数が指定割合よりも小さい場合は、**その他**に丸めて集計をします(単位: %)",
+                            min_value=0.0,
+                            max_value=100.0,
+                            value=5.0,
+                            step=5.0,
+                            key="threshold_tab5_1"
+                        )
+                # ディメンション(2つ目)
+                with st.expander("**集計時のディメンションの選択(その2)**"):
+                    col_dim2 = st.selectbox(
+                        "2つ目のディメンション(文字列型or日付型の変数)を選択してください",
+                        st.session_state.non_numeric_columns + st.session_state.datetime_columns,
+                        key="non_numeric_column_tab5_2"
+                    )
+                    if col_dim1 == col_dim2:
+                        st.error("ディメンションに同じカラムを指定することはできません", icon=":material/error:")
+                    # dimの選択肢毎に前処理を実施
+                    if col_dim2 in st.session_state.datetime_columns:
+                        datetime_type2 = st.selectbox(
+                            "集計時における日付カラムの粒度を選択してください",
+                            ["月", "週", "日", "時間"],
+                            key="datetime_type_tab5_2"
+                        )
+                    elif col_dim2 in st.session_state.non_numeric_columns:
+                        threshold2 = st.number_input(
+                            "文字列型の変数において、特定の要素と一致するレコード数が指定割合よりも小さい場合は、**その他**に丸めて集計をします(単位: %)",
+                            min_value=0.0,
+                            max_value=100.0,
+                            value=5.0,
+                            step=5.0,
+                            key="threshold_tab5_2"
+                        )
+                if col_dim1 == col_dim2:
+                    st.error("ディメンションに同じカラムを指定することはできません", icon=":material/error:")
+                with st.expander("**集計方法の選択**"):
+                # 集計方法を指定
+                    plot_type = st.selectbox(
+                            "集計方法を選択してください",
+                            ["クロス集計", "時系列グラフ"],
+                            key="plot_type_tab5"
+                        )
+                
+                ##### 指定した集計方法に基づきデータ加工を行う
+                # クロス集計
+                if plot_type == "クロス集計" and col_dim1 != col_dim2:
+                    st.header(f"{col_dim1}と{col_dim2}の属性別の、{col_numeric}の{agg_type}の変化")
+                    st.write(f"行: {col_dim1}, 列: {col_dim2}")
+                    st.write(f"※文字列型の変数をディメンションにした場合、レコード数の割合が一定値以下の場合は\n**その他**に丸め処理をしている")
+                    # ディメンションが共に日付型データ
+                    if col_dim1 in st.session_state.datetime_columns and\
+                    col_dim2 in st.session_state.datetime_columns:
+                        agg_df = fba.agg_datetime_2col_dataframe(st.session_state.df, datetime_type1, datetime_type2,
+                                                        agg_type, col_dim1, col_dim2, col_numeric)
+                        st.dataframe(agg_df)
+                    # ディメンションが共に文字列型データ
+                    elif col_dim1 in st.session_state.non_numeric_columns and\
+                    col_dim2 in st.session_state.non_numeric_columns:
+                        agg_df = fba.agg_category_2col_dataframe(st.session_state.df, col_dim1, col_dim2, col_numeric,
+                                                        agg_type, threshold1, threshold2)
+                        st.dataframe(agg_df)
+                    # ディメンションが文字列・日付型の複合
+                    else:
+                        # どちらの変数が文字列なのかによって、関数の引数を変更する
+                        if col_dim1 in st.session_state.non_numeric_columns:
+                            col_category = col_dim1
+                            threshold_input = threshold1
+                            col_datetime = col_dim2
+                            datetime_type_input = datetime_type2
+                        else:
+                            col_category = col_dim2
+                            threshold_input = threshold2
+                            col_datetime = col_dim1
+                            datetime_type_input = datetime_type1
+                        agg_df = fba.agg_category_datetime_dataframe(st.session_state.df, col_category, col_datetime, col_numeric,
+                                                        agg_type, threshold_input, datetime_type_input)
+                        st.dataframe(agg_df)
+                # 時系列グラフ
+                elif plot_type == "時系列グラフ" and col_dim1 != col_dim2:
+                    st.header(f"{col_dim1}の日時経過に対する{col_numeric}の{agg_type}の推移")
+                    # ディメンションが共に文字列型データの場合はエラーを返す
+                    if col_dim1 in st.session_state.non_numeric_columns and\
+                    col_dim2 in st.session_state.non_numeric_columns:
+                        st.error("日付型のディメンションを少なくとも1つ以上選択してください", icon=":material/error:")
+                    #ディメンションが共に日付型データの場合の描画
+                    elif col_dim1 in st.session_state.datetime_columns and\
+                    col_dim2 in st.session_state.datetime_columns:
+                        # agg_dfのindex→col_dim1, column→col_dim2となる
+                        agg_df = fba.agg_datetime_2col_dataframe(st.session_state.df, datetime_type1, datetime_type2,
+                                                        agg_type, col_dim1, col_dim2, col_numeric)
+                        fig = fba.plot_date_category_3val(agg_df, col_numeric, col_dim1, col_dim2, agg_type)
+                        st.pyplot(fig, clear_figure=False)
+                        st.dataframe(agg_df)
+                    # ディメンションが文字列・日付型の複合
+                    else:
+                        # どちらの変数が文字列なのかによって、関数の引数を変更する
+                        if col_dim1 in st.session_state.non_numeric_columns:
+                            col_category = col_dim1
+                            threshold_input = threshold1
+                            col_datetime = col_dim2
+                            datetime_type_input = datetime_type2
+                        else:
+                            col_category = col_dim2
+                            threshold_input = threshold2
+                            col_datetime = col_dim1
+                            datetime_type_input = datetime_type1
+                        agg_df = fba.agg_category_datetime_dataframe(st.session_state.df, col_category, col_datetime, col_numeric,
+                                                        agg_type, threshold_input, datetime_type_input)
+                        fig = fba.plot_date_category_3val(agg_df, col_numeric, col_datetime, col_category, agg_type)
+                        st.pyplot(fig, clear_figure=False)
+                        st.dataframe(agg_df)
+
+            plot_tab5_timeline()
+        else:
+            st.write("集計に必要な変数がデータに含まれていません")
