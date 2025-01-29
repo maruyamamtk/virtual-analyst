@@ -396,24 +396,3 @@ def plot_date_category_3val(df, col_numeric, col_timeline, col_category,
     plt.tight_layout()
 
     return fig
-
-# def plot_date_category_3val(df, col_numeric, col_timeline, col_category,
-#                             agg_type, plot_type, plot_agg_type1, plot_agg_type2):
-#     # 欠損値は0を補完する
-#     df = df.fillna(0)
-
-#     fig, ax = plt.subplots()
-
-#     # 各カテゴリごとにプロット
-#     for category in df.columns:
-#         ax.plot(df.index, df[category], label=category)
-
-#     ax.set_title(f'日付に対する{col_category}毎の{col_numeric}の{agg_type}の推移')
-#     ax.set_xlabel(col_timeline)
-#     ax.set_ylabel(col_numeric)
-#     # 凡例をグラフの枠の外側（右側）に配置
-#     ax.legend(title=col_category, bbox_to_anchor=(1.05, 1), loc='upper left')
-#     plt.xticks(rotation=45)
-#     plt.tight_layout()
-
-#     return fig

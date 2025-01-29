@@ -157,6 +157,7 @@ else:
     with tab_list[3]:
         st.header("2変数(数値型×文字列,日付型)")
         st.divider()
+        st.write("カテゴリ変数(日付 or 文字列)に対する、数値型の変数の集計値の変化を把握することができます")
 
         # 内部にtabを作成
         tab_list_3 = st.tabs(
@@ -426,6 +427,7 @@ else:
                         ["棒グラフ", "折れ線グラフ"],
                         key="plot_type_tab5_detail"
                     )
+                    st.write("**描画の詳細条件:**")
                     plot_agg_type1 = st.toggle("実数ではなく割合で描画する")
                     plot_agg_type2 = False # 折れ線グラフの場合は、常にFalseとする(積み上げで描画しない)
                     if plot_type == "棒グラフ":
@@ -434,9 +436,19 @@ else:
                     if col_dim1 in st.session_state.non_numeric_columns and\
                     col_dim2 in st.session_state.non_numeric_columns:
                         st.error("日付型のディメンションを少なくとも1つ以上選択してください", icon=":material/error:")
-                    #ディメンションが共に日付型データの場合の描画
+                    # ディメンションが共に日付型データの場合の描画
                     elif col_dim1 in st.session_state.datetime_columns and\
                     col_dim2 in st.session_state.datetime_columns:
+                        # 日付を入れ替える機能を実装
+                        st.write("**2つのディメンションが共に日付型の変数の場合:**")
+                        date_switch_flag = st.toggle("横軸に指定する日付のカラムを入れ替える")
+                        if date_switch_flag:
+                            col_tmp = col_dim1
+                            datetime_type_tmp = datetime_type1
+                            col_dim1 = col_dim2
+                            datetime_type1 = datetime_type2
+                            col_dim2 = col_tmp
+                            datetime_type2 = datetime_type_tmp
                         # agg_dfのindex→col_dim1, column→col_dim2となる
                         agg_df = fba.agg_datetime_2col_dataframe(st.session_state.df, datetime_type1, datetime_type2,
                                                         agg_type, col_dim1, col_dim2, col_numeric)
