@@ -360,22 +360,60 @@ def agg_category_datetime_dataframe(df_input, col_category, col_datetime, col_nu
 
 # 3変数を用いた時系列プロット
 @st.cache_data
-def plot_date_category_3val(df, col_numeric, col_timeline, col_category, agg_type):
+def plot_date_category_3val(df, col_numeric, col_timeline, col_category,
+                            agg_type, plot_type, plot_agg_type1, plot_agg_type2):
     # 欠損値は0を補完する
     df = df.fillna(0)
 
+    # 割合で描画するかどうかで、データ & ラベルを変更する
+    if plot_agg_type1:
+        df = df.div(df.sum(axis=1), axis=0) * 100
+        ylabel = f'{col_numeric}の割合 (%)'
+    else:
+        ylabel = col_numeric
+
     fig, ax = plt.subplots()
 
-    # 各カテゴリごとにプロット
-    for category in df.columns:
-        ax.plot(df.index, df[category], label=category)
+    if plot_type == '棒グラフ':
+        if plot_agg_type2:
+            # 積み上げ棒グラフ
+            df.plot(kind='bar', stacked=True, ax=ax)
+        else:
+            # 通常の棒グラフ
+            df.plot(kind='bar', ax=ax)
+    elif plot_type == '折れ線グラフ':
+        # 折れ線グラフ
+        for category in df.columns:
+            ax.plot(df.index, df[category], label=category)
 
     ax.set_title(f'日付に対する{col_category}毎の{col_numeric}の{agg_type}の推移')
     ax.set_xlabel(col_timeline)
-    ax.set_ylabel(col_numeric)
+    ax.set_ylabel(ylabel)
+
     # 凡例をグラフの枠の外側（右側）に配置
     ax.legend(title=col_category, bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.xticks(rotation=45)
     plt.tight_layout()
 
     return fig
+
+# def plot_date_category_3val(df, col_numeric, col_timeline, col_category,
+#                             agg_type, plot_type, plot_agg_type1, plot_agg_type2):
+#     # 欠損値は0を補完する
+#     df = df.fillna(0)
+
+#     fig, ax = plt.subplots()
+
+#     # 各カテゴリごとにプロット
+#     for category in df.columns:
+#         ax.plot(df.index, df[category], label=category)
+
+#     ax.set_title(f'日付に対する{col_category}毎の{col_numeric}の{agg_type}の推移')
+#     ax.set_xlabel(col_timeline)
+#     ax.set_ylabel(col_numeric)
+#     # 凡例をグラフの枠の外側（右側）に配置
+#     ax.legend(title=col_category, bbox_to_anchor=(1.05, 1), loc='upper left')
+#     plt.xticks(rotation=45)
+#     plt.tight_layout()
+
+#     return fig

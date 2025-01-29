@@ -314,6 +314,7 @@ else:
             def plot_tab5_timeline():
                 ##### 描画のパラメータを入力
                 st.markdown("### 描画パラメータの設定")
+                st.write("指定した2つのディメンションに対する、数値型の変数の集計値の変化を把握することができます")
                 with st.expander("**数値型の変数の選択**"):
                     col_numeric = st.selectbox(
                         "集計対象の数値型の変数を選択してください",
@@ -375,10 +376,10 @@ else:
                         )
                 if col_dim1 == col_dim2:
                     st.error("ディメンションに同じカラムを指定することはできません", icon=":material/error:")
-                with st.expander("**集計方法の選択**"):
+                with st.expander("**集計・可視化方法の選択**"):
                 # 集計方法を指定
                     plot_type = st.selectbox(
-                            "集計方法を選択してください",
+                            "集計・可視化の方法を選択してください",
                             ["クロス集計", "時系列グラフ"],
                             key="plot_type_tab5"
                         )
@@ -399,7 +400,7 @@ else:
                     elif col_dim1 in st.session_state.non_numeric_columns and\
                     col_dim2 in st.session_state.non_numeric_columns:
                         agg_df = fba.agg_category_2col_dataframe(st.session_state.df, col_dim1, col_dim2, col_numeric,
-                                                        agg_type, threshold1, threshold2)
+                                                        agg_type, threshold1/100, threshold2/100)
                         st.dataframe(agg_df)
                     # ディメンションが文字列・日付型の複合
                     else:
@@ -415,11 +416,20 @@ else:
                             col_datetime = col_dim1
                             datetime_type_input = datetime_type1
                         agg_df = fba.agg_category_datetime_dataframe(st.session_state.df, col_category, col_datetime, col_numeric,
-                                                        agg_type, threshold_input, datetime_type_input)
+                                                        agg_type, threshold_input/100, datetime_type_input)
                         st.dataframe(agg_df)
                 # 時系列グラフ
                 elif plot_type == "時系列グラフ" and col_dim1 != col_dim2:
                     st.header(f"{col_dim1}の日時経過に対する{col_numeric}の{agg_type}の推移")
+                    plot_type = st.selectbox(
+                        "グラフの描画方法を選択してください",
+                        ["棒グラフ", "折れ線グラフ"],
+                        key="plot_type_tab5_detail"
+                    )
+                    plot_agg_type1 = st.toggle("実数ではなく割合で描画する")
+                    plot_agg_type2 = False # 折れ線グラフの場合は、常にFalseとする(積み上げで描画しない)
+                    if plot_type == "棒グラフ":
+                        plot_agg_type2 = st.toggle("積み上げグラフ")
                     # ディメンションが共に文字列型データの場合はエラーを返す
                     if col_dim1 in st.session_state.non_numeric_columns and\
                     col_dim2 in st.session_state.non_numeric_columns:
@@ -430,7 +440,8 @@ else:
                         # agg_dfのindex→col_dim1, column→col_dim2となる
                         agg_df = fba.agg_datetime_2col_dataframe(st.session_state.df, datetime_type1, datetime_type2,
                                                         agg_type, col_dim1, col_dim2, col_numeric)
-                        fig = fba.plot_date_category_3val(agg_df, col_numeric, col_dim1, col_dim2, agg_type)
+                        fig = fba.plot_date_category_3val(agg_df, col_numeric, col_dim1, col_dim2,
+                                                          agg_type, plot_type, plot_agg_type1, plot_agg_type2)
                         st.pyplot(fig, clear_figure=False)
                         st.dataframe(agg_df)
                     # ディメンションが文字列・日付型の複合
@@ -447,8 +458,9 @@ else:
                             col_datetime = col_dim1
                             datetime_type_input = datetime_type1
                         agg_df = fba.agg_category_datetime_dataframe(st.session_state.df, col_category, col_datetime, col_numeric,
-                                                        agg_type, threshold_input, datetime_type_input)
-                        fig = fba.plot_date_category_3val(agg_df, col_numeric, col_datetime, col_category, agg_type)
+                                                        agg_type, threshold_input/100, datetime_type_input)
+                        fig = fba.plot_date_category_3val(agg_df, col_numeric, col_datetime, col_category,
+                                                          agg_type, plot_type, plot_agg_type1, plot_agg_type2)
                         st.pyplot(fig, clear_figure=False)
                         st.dataframe(agg_df)
 
