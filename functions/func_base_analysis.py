@@ -6,12 +6,6 @@ import japanize_matplotlib
 import functions.download_files as download_files
 from datetime import datetime
 
-##############################
-#
-# 全ての関数をst.cache_dataによってキャッシュ化し、実行時間の短縮を試みている
-#
-##############################
-
 ##### 1変数の分布の可視化
 # 数値型のヒストグラム
 def histogram(df, colname):

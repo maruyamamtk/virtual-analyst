@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import sys
 import io
+import traceback
 
 # LangChainとOpenAI関連のインポート
 from langchain.chat_models import ChatOpenAI
@@ -11,7 +12,8 @@ from langchain_experimental.utilities import PythonREPL
 from langchain.agents import Tool
 
 from functions.multi_pages import multi_page
- 
+import functions.func_chatbot as fc
+
 # 環境変数が設定されていない場合、以下のコマンドを実行する必要がある
 # python -m streamlit run .\streamlit_app.py
 
@@ -31,89 +33,63 @@ st.set_page_config(
 multi_page()
 
 ###########################
+# 初期設定
+###########################
+st.title("Chatbotによる自動分析")
+clear_conversation = st.button("会話の履歴をリセットする", key="clear_conversation")
+# チャットの開始(st.session_state.messagesの初期化)
+fc.init_messages(clear_conversation)
+
+###########################
 # チャットボットのUIを構築
 ###########################
-st.title("データ分析Webアプリ")
-analysis_query = st.text_area("【分析内容の指示】\n実施したい分析内容を入力してください。", height=150)
+# チャットメッセージを表示
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-if st.button("分析を実行"):
-    if not analysis_query.strip():
-        st.error("分析内容を入力してください。")
-    else:
-        with st.spinner("ChatGPTがコードを生成中です…"):
-            # --- ChatGPTへ送るプロンプトの作成 ---
-            # ユーザーの分析要求と、dfの概要情報（カラム名）をプロンプトに含めています。
-            prompt_template = f"""
-                DataFrame 'st.session_state.df' には、以下のカラムが存在します。
+# ユーザーからの入力を受け付ける
+if user_input := st.chat_input("分析内容を入力してください"):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-                - 数値型カラム: {st.session_state.numeric_columns}
-                - 文字列型カラム: {st.session_state.non_numeric_columns}
-                - 日付型カラム: {st.session_state.datetime_columns}
+    # 入力を受け付けた後コードを生成&表示する
+    with st.spinner("ChatGPTがコードを生成中です…"):
+        generated_code = fc.generate_code(user_input)
+        st.session_state.messages.append({"role": "assistant", "content": generated_code})
+        with st.chat_message("assistant"):
+            st.write(f"生成されたコード:\n")
+            st.code(generated_code, language="python")
 
-                上記の前提で、後述の要件を満たすPythonのコードを作成してください。
-                # ユーザーからの分析要求
-                -----------------------
-                {analysis_query}
-                -----------------------
-                # 詳細な要件
-                - 分析結果の解釈に必要な数値やグラフは漏れが無いように出力してください。
-                - 加工するDataFrameは変数 `st.session_state.df` であり、結果は変数 `result` に格納するものとします。  
-                - 必要に応じて、以下のライブラリを利用してください。
-                  - pandas
-                  - numpy
-                  - scikit-learn
-                  - statsmodels
-                - 以下の形式でコードのみ出力してください:
-                ```
-                # 必要なライブラリは追加でimportしてください
-                import pandas as pd
-                import numpy as np
-                import streamlit as st
-                # ここにコードを書く
-                result = [] # 出力したい実行結果を格納するリスト。必要なオブジェクトを適宜appendしていく
-                
-                # コードの最後の処理は必ず以下のように指定する
-                for element in result:
-                    # streamlitの関数を使って、適切に出力・描画をしてください
-                    print(result)
-                ```
-            """
-
-        prompt = PromptTemplate(
-            input_variables=[
-                "numeric_columns",
-                "non_numeric_columns",
-                "datetime_columns",
-                "analysis_query"
-                ],
-            template=prompt_template
-        )
-
-        # --- LangChainのChatOpenAIを利用 ---
-        # APIキーは st.secrets などで管理してください
-        llm = ChatOpenAI(
-            temperature=0, 
-            model_name="gpt-3.5-turbo", 
-            openai_api_key="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"
-            # openai_api_key=st.secrets["OPENAI_API_KEY"]  # secrets管理されたAPIキーを利用
-        )
-
-        chain = LLMChain(llm=llm, prompt=prompt)
-
-        # プロンプト変数を埋め込んでChatGPTへ問い合わせ
-        generated_response = chain.run({
-            "numeric_columns": st.session_state.numeric_columns,
-            "non_numeric_columns": st.session_state.non_numeric_columns,
-            "datetime_columns": st.session_state.datetime_columns,
-            "analysis_query": analysis_query
-        })
-
-        # 生成されたコードを画面に表示
-        st.subheader("生成されたコード")
-        st.code(generated_response, language="python")
-
-        # --- 生成されたコードの実行 ---
+        # コード生成後、実行結果を表示する
         st.info("生成されたコードを実行中…")
-        python_repl = PythonREPL()
-        result = python_repl.run(generated_response)
-        print(result)
+        result = fc.execute_code(generated_code)
+        st.session_state.messages.append({"role": "assistant", "content": result})
+        with st.chat_message("assistant"):
+            try:
+                st.code(result)
+            except:
+                st.write(result)
+        
+        # エラーが出た場合、その内容をもとにコード修正 & 再実行をする
+        if "Error" in result:
+            st.session_state.messages.append({"role": "user", "content": "正しく実行ができていないため、エラー内容をもとに自動でコードの修正を実施中"})
+            with st.chat_message("user"):
+                st.markdown("正しく実行ができていないため、エラー内容をもとに自動でコードの修正を実施中")
+            # コードを生成
+            generated_code = fc.re_generate_code(generated_code, result)
+            st.session_state.messages.append({"role": "assistant", "content": generated_code})
+            with st.chat_message("assistant"):
+                st.write(f"生成されたコード:\n")
+                st.code(generated_code, language="python")
+            # 実行結果を出力
+            result = fc.execute_code(generated_code)
+            st.session_state.messages.append({"role": "assistant", "content": result})
+            with st.chat_message("assistant"):
+                try:
+                    st.code(result)
+                    st.error("自動実行でエラーが解消されなかったので、再度指示を入力してください")
+                except:
+                    st.write(result)
+                    st.error("自動実行でエラーが解消されなかったので、再度指示を入力してください")
