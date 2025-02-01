@@ -7,3 +7,4 @@ def multi_page():
         st.page_link("pages/change_datatype.py", label="データの型変換", icon="🔄")
         st.page_link("pages/filtering.py", label="データのフィルター", icon="🔽")
         st.page_link("pages/base_analysis.py", label="基礎集計", icon="📊")
+        st.page_link("pages/chatbot.py", label="チャットボット", icon="🤖")
