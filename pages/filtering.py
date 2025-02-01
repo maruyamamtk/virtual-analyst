@@ -32,7 +32,7 @@ else:
     )
     
     with tab_list[0]:
-        st.markdown("## フィルタ条件の設定")
+        st.markdown("## フィルタ条件の解除")
         # フィルタをリセットするボタン(目立たせるためのスタイルを追加)
         button_css = f"""
             <style>
@@ -48,9 +48,29 @@ else:
         st.markdown(button_css, unsafe_allow_html=True)
         reset_flag = st.button("フィルタをリセット", key="reset_button")
         if reset_flag:
+            # データそのものをリセット
             st.session_state.df = st.session_state.df_original.copy()
+            # 対象カラムをリセット
+            st.session_state.numeric_columns = st.session_state.numeric_columns_original.copy()
+            st.session_state.datetime_columns = st.session_state.datetime_columns_original.copy()
+            st.session_state.non_numeric_columns = st.session_state.non_numeric_columns_original.copy()
+
+        # 使用するカラムを選択
+        st.markdown("## 使用カラムの設定")
+        selected_columns = st.multiselect(
+            "分析に使用するカラムを選択してください",
+            options=st.session_state.df_original.columns,
+            default=st.session_state.df.columns
+        )
+
+        # 使用するカラムに基づいてsession_stateのデータ・カラムを更新する
+        st.session_state.df = st.session_state.df[selected_columns]
+        st.session_state.numeric_columns = st.session_state.df.select_dtypes(include=['number']).columns.tolist()
+        st.session_state.datetime_columns = st.session_state.df.select_dtypes(include=['datetime']).columns.tolist()
+        st.session_state.non_numeric_columns = st.session_state.df.select_dtypes(exclude=['number', 'datetime']).columns.tolist()
 
         # 各カラムごとにフィルタを作成
+        st.markdown("## カラム別の範囲の指定")
         for column in st.session_state.df.columns:
             st.markdown(f"### {column}の範囲の指定")
             if st.session_state.df[column].dtype in ['object', 'string']:

@@ -45,8 +45,11 @@ if uploaded_file is not None:
 
     # カラム名を保存
     # 数値型のカラム名のリスト
+    st.session_state.numeric_columns_original = st.session_state.df.select_dtypes(include=['number']).columns.tolist()
     st.session_state.numeric_columns = st.session_state.df.select_dtypes(include=['number']).columns.tolist()
     # 日付型のカラム名のリスト
+    st.session_state.datetime_columns_original = st.session_state.df.select_dtypes(include=['datetime']).columns.tolist()
     st.session_state.datetime_columns = st.session_state.df.select_dtypes(include=['datetime']).columns.tolist()
     # 文字列型のカラム名のリスト
+    st.session_state.non_numeric_columns_original = st.session_state.df.select_dtypes(exclude=['number', 'datetime']).columns.tolist()
     st.session_state.non_numeric_columns = st.session_state.df.select_dtypes(exclude=['number', 'datetime']).columns.tolist()
