@@ -3,6 +3,7 @@ import pandas as pd
 from functions.multi_pages import multi_page
 import functions.func_base_analysis as fba
 import functions.error_messages as em
+import functions.download_files as download_files
 
 ###########################
 # ページの設定
@@ -28,14 +29,13 @@ if 'df' not in st.session_state or st.session_state.df is None:
     st.write("CSVファイルをアップロードしてください。")
 else:
     # タブの作成
-    tab_list = st.tabs(
-        ["データの概要",
+    tab_names = ["データの概要",
          "1変数の統計量",
          "2変数(数値型×数値型)",
          "2変数(数値型×文字列,日付型)",
          "2変数(文字列型×文字列型)",
-         "3変数"]
-        )
+         "3変数(クロス集計)"]
+    tab_list = st.tabs(tab_names)
 
     ##### データの概要を出力するタブ
     with tab_list[0]:
@@ -59,6 +59,8 @@ else:
                 "1": st.column_config.NumberColumn("欠損レコード数"),
             }
             st.dataframe(df_summary, column_config=column_config)
+            download_files.download_file(df_summary, tab_names[0]+"_データ型",
+                                         key="summary", index_flag=True)
         with col_right:
             st.header("データの概要")
             st.divider()
@@ -107,7 +109,7 @@ else:
                     key="non_numeric_column_tab1"
                 )
                 st.write(f"選択された変数: {selected_non_numeric_column}")
-                df_count = fba.colname_counts(st.session_state.df, selected_non_numeric_column)
+                df_count = fba.colname_counts(st.session_state.df, selected_non_numeric_column, download_flag=True)
                 df_count['割合'] = df_count['割合'] * 100 # 割合を0~100%に対する比率に変換
                 column_config = {
                     # 割合を0~100%に対する比率で表示

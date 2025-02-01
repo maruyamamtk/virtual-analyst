@@ -3,6 +3,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import japanize_matplotlib
+import functions.download_files as download_files
+from datetime import datetime
 
 ##############################
 #
@@ -12,18 +14,18 @@ import japanize_matplotlib
 
 ##### 1変数の分布の可視化
 # 数値型のヒストグラム
-@st.cache_data
 def histogram(df, colname):
     fig, ax = plt.subplots()
     sns.histplot(df[colname], kde=True, ax=ax)
     ax.set_title(f'ヒストグラム: {colname}')
     ax.set_xlabel(colname)
     ax.set_ylabel('頻度')
+    # ファイルダウンロード
+    download_files.download_file(fig, colname + 'のヒストグラム', key="histogram")
     return fig
 
 # 文字列型の度数分布表
-@st.cache_data
-def colname_counts(df, colname, threshold=0.05):
+def colname_counts(df, colname, download_flag=False, threshold=0.05):
     # 項目ごとに要素の数を数える
     counts = df[colname].value_counts().reset_index()
     counts.columns = [colname, 'レコード数']
@@ -35,33 +37,42 @@ def colname_counts(df, colname, threshold=0.05):
     # 割合が閾値以下の場合に「その他」というカテゴリを与える
     counts['カテゴリ'] = counts.apply(lambda row: 'その他' if row['割合'] <= threshold else row[colname], axis=1)
     
+    # ファイルダウンロードを行うかどうか判定
+    # 別の描画関数の内部で呼び出されることがあるため、flagによる分岐を設定
+    if download_flag:
+        # 現在時刻を取得
+        now = datetime.now()
+        # 文字列にフォーマット
+        current_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        download_files.download_file(counts, colname + 'の度数分布', key="colname_counts"+current_time_str)
     return counts
 
 ##### 2変数の分布の可視化
 # 相関行列のヒートマップ
-@st.cache_data
 def plot_correlation_heatmap(df):
     corr = df.corr()
     fig, ax = plt.subplots()
     sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
     ax.set_title('相関行列のヒートマップ')
+    # ファイルダウンロード
+    download_files.download_file(fig, "相関行列", key="plot_correlation_heatmap")
     return fig
 
 # 数値型×数値型
-@st.cache_data
 def plot_scatter(df, col1, col2):
     fig, ax = plt.subplots()
     sns.scatterplot(x=df[col1], y=df[col2], ax=ax)
     ax.set_title(f'{col1}と{col2}の散布図')
     ax.set_xlabel(col1)
     ax.set_ylabel(col2)
+    # ファイルダウンロード
+    download_files.download_file(fig, col1+"と"+col2+"の散布図", key="plot_scatter")
     return fig
 
 # 数値型×文字列型
-@st.cache_data
 def plot_box(df, col1, col2, threshold):
     # 数値型の度数分布を集計しておく
-    value_counts = colname_counts(df, col1, threshold)
+    value_counts = colname_counts(df, col1, False, threshold)
     # 度数分布の割合を基に算出したカテゴリをleft join
     df = pd.merge(df, value_counts[[col1, 'カテゴリ']], on=col1, how="left")
 
@@ -70,13 +81,15 @@ def plot_box(df, col1, col2, threshold):
     #ax.set_title(f'{col1}に対する{col2}の箱ひげ図')
     ax.set_xlabel(col1)
     ax.set_ylabel(col2)
+    # ファイルダウンロード
+    download_files.download_file(fig, col1+"に対する"+col2+"の分布の比較",
+                                 key="plot_box")
     return fig
 
 # 1つの文字列型ごとに数値の集計を行う
-@st.cache_data
 def agg_1parameter(df, col1, col2, threshold):
     # 数値型の度数分布を集計しておく
-    value_counts = colname_counts(df, col1, threshold)
+    value_counts = colname_counts(df, col1, False, threshold)
     # 度数分布の割合を基に算出したカテゴリをleft join
     df = pd.merge(df, value_counts[[col1, 'カテゴリ']], on=col1, how="left")
 
@@ -94,14 +107,17 @@ def agg_1parameter(df, col1, col2, threshold):
     for df_tmp in agg_data_list:
         agg_data = pd.merge(agg_data, df_tmp, on='カテゴリ', how='left')
 
-    # 元のカラム名に戻す
+    # 元のカラム名に戻してソートする
     agg_data = agg_data.rename(columns = {'カテゴリ': col1})
     agg_data = agg_data[~agg_data[col1].isnull()]
-    
-    return agg_data.sort_values(by='レコード数', ascending=False)
+    agg_data = agg_data.sort_values(by='レコード数', ascending=False)
+
+    # ファイルダウンロード
+    download_files.download_file(agg_data, col1+"に対する"+col2+"の集計値",
+                                 key="agg_1parameter")
+    return agg_data
 
 # 時系列の変数を用いて数値を集計する
-@st.cache_data
 def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_numeric):
     df = df_input[[col_datetime, col_numeric]].copy() # 必要カラムのみに絞りこみ
     df.set_index(col_datetime, inplace=True)
@@ -147,7 +163,6 @@ def agg_datetime_dataframe(df_input, datetime_type, agg_type, col_datetime, col_
     return agg_df.reset_index().sort_values(by=col_datetime, ascending=True)
 
 # 時系列に対する1変数の推移の描画
-@st.cache_data
 def plot_datetime_1param(df, col_datetime, col_numeric, plot_type, datetime_type):
     # datetime_typeに応じてdf[col_datetime]のデータの中身を変更
     if datetime_type == '日'  or datetime_type == '週':
@@ -172,19 +187,22 @@ def plot_datetime_1param(df, col_datetime, col_numeric, plot_type, datetime_type
     plt.xticks(rotation=45)
     plt.tight_layout()
 
+    # ファイルダウンロード
+    download_files.download_file(fig, col_datetime+"に対する"+col_numeric+"の推移",
+                                 key="plot_datetime_1param")
+
     return fig
 
 # 文字列型×文字列型
 # ベースとなるクロス集計表を作成
-@st.cache_data
 def cross_counts(df_input, col1, col2, threshold=0.05):
     # st.session_state.dfに直接影響が出ないようコピーを作成
     df = df_input.copy()
     
     # col1, col2に対して「その他」というカテゴリを与える(度数分布がthreshold以下)
-    counts_col1 = colname_counts(df, col1, threshold)
+    counts_col1 = colname_counts(df, col1, False, threshold)
     df['カテゴリ1'] = df[col1].map(counts_col1.set_index(col1)['カテゴリ'])
-    counts_col2 = colname_counts(df, col2, threshold)
+    counts_col2 = colname_counts(df, col2, False, threshold)
     df['カテゴリ2'] = df[col2].map(counts_col2.set_index(col2)['カテゴリ'])
     
     # クロス集計を行う
@@ -199,7 +217,6 @@ def cross_counts(df_input, col1, col2, threshold=0.05):
     return pivot_table
     
 # heatmapの作成
-@st.cache_data
 def plot_cross_heatmap(df, col1, col2):
     # クロス集計表を出力
     pivot_table = cross_counts(df, col1, col2)
@@ -208,10 +225,13 @@ def plot_cross_heatmap(df, col1, col2):
     fig, ax = plt.subplots()
     sns.heatmap(pivot_table, annot=True, fmt="d", cmap="coolwarm", ax=ax)
     ax.set_title(f'{col1}と{col2}のクロス集計ヒートマップ')
+
+    # ファイルダウンロード
+    download_files.download_file(fig, col1+"と"+col2+"に対するレコード数の分布",
+                                 key="plot_cross_heatmap")
     return fig
 
 # 積み上げ棒グラフの作成
-@st.cache_data
 def plot_cross_bar(df, col1, col2, normalize):
     # クロス集計表を出力
     pivot_table = cross_counts(df, col1, col2)
@@ -228,12 +248,14 @@ def plot_cross_bar(df, col1, col2, normalize):
     ax.set_xlabel(col1)
     ax.set_ylabel('割合' if normalize else '要素数')
     ax.legend(title=col2)
+    # ファイルダウンロード
+    download_files.download_file(fig, f'{col1}と{col2}の積み上げ棒グラフ',
+                                 key="plot_cross_bar")
     
     return fig
 
 # 3変数の集計
 # 日付×日付ごとにクロス集計
-@st.cache_data
 def agg_datetime_2col_dataframe(df_input, datetime_type1, datetime_type2,
                                 agg_type, col_datetime1, col_datetime2, col_numeric):
     df = df_input[[col_datetime1, col_datetime2, col_numeric]].copy()  # 必要カラムのみに絞りこみ
@@ -285,18 +307,20 @@ def agg_datetime_2col_dataframe(df_input, datetime_type1, datetime_type2,
     # アウトプット用にデータを整形
     agg_df = agg_df.sort_values(by=[col_datetime1, col_datetime2], ascending=True)
     agg_df = pd.pivot(agg_df, index=col_datetime1, columns=col_datetime2, values=col_numeric)
+    # ファイルダウンロード
+    download_files.download_file(agg_df, f'{col_datetime1},{col_datetime2}に対する{col_numeric}のクロス集計',
+                                 key="agg_category_datetime_dataframe", index_flag=True)
     return agg_df
 
 # 文字列型×文字列型ごとにクロス集計
-@st.cache_data
 def agg_category_2col_dataframe(df_input, col1, col2, col_numeric, agg_type, threshold1=0.05, threshold2=0.05):
     # st.session_state.dfに直接影響が出ないようコピーを作成
     df = df_input.copy()
     
     # col1, col2に対して「その他」というカテゴリを与える(度数分布がthreshold以下)
-    counts_col1 = colname_counts(df, col1, threshold1)
+    counts_col1 = colname_counts(df, col1, False, threshold1)
     df['カテゴリ1'] = df[col1].map(counts_col1.set_index(col1)['カテゴリ'])
-    counts_col2 = colname_counts(df, col2, threshold1)
+    counts_col2 = colname_counts(df, col2, False, threshold1)
     df['カテゴリ2'] = df[col2].map(counts_col2.set_index(col2)['カテゴリ'])
 
     # 必要なカラムだけ抽出
@@ -313,17 +337,19 @@ def agg_category_2col_dataframe(df_input, col1, col2, col_numeric, agg_type, thr
 
     agg_df = agg_df.sort_values(by=['カテゴリ1', 'カテゴリ2'], ascending=True)
     agg_df = pd.pivot(agg_df, index='カテゴリ1', columns='カテゴリ2', values=col_numeric)
+    # ファイルダウンロード
+    download_files.download_file(agg_df, f'{col1},{col2}に対する{col_numeric}のクロス集計',
+                                 key="agg_category_datetime_dataframe", index_flag=True)
     return agg_df
 
 # 文字列型×日付型ごとにクロス集計
-@st.cache_data
 def agg_category_datetime_dataframe(df_input, col_category, col_datetime, col_numeric,
                                                         agg_type, threshold_input, datetime_type_input):
     # st.session_state.dfに直接影響が出ないようコピーを作成
     df = df_input.copy()
 
     # col_categoryに対して「その他」というカテゴリを与える(度数分布がthreshold_input以下)
-    counts_col1 = colname_counts(df, col_category, threshold_input)
+    counts_col1 = colname_counts(df, col_category, False, threshold_input)
     df['カテゴリ'] = df[col_category].map(counts_col1.set_index(col_category)['カテゴリ'])
 
     # datetime_type_inputに応じて日付カラムの粒度を変更
@@ -356,10 +382,13 @@ def agg_category_datetime_dataframe(df_input, col_category, col_datetime, col_nu
 
     agg_df = agg_df.sort_values(by=[col_datetime, 'カテゴリ'], ascending=True)
     agg_df = pd.pivot(agg_df, index=col_datetime, columns='カテゴリ', values=col_numeric)
+
+    # ファイルダウンロード
+    download_files.download_file(agg_df, f'{col_datetime},{col_category}に対する{col_numeric}のクロス集計',
+                                 key="agg_category_datetime_dataframe", index_flag=True)
     return agg_df
 
 # 3変数を用いた時系列プロット
-@st.cache_data
 def plot_date_category_3val(df, col_numeric, col_timeline, col_category,
                             agg_type, plot_type, plot_agg_type1, plot_agg_type2):
     # 欠損値は0を補完する
@@ -394,5 +423,9 @@ def plot_date_category_3val(df, col_numeric, col_timeline, col_category,
     ax.legend(title=col_category, bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.xticks(rotation=45)
     plt.tight_layout()
+
+    # ファイルダウンロード
+    download_files.download_file(fig, f'{col_timeline}に対する{col_category}毎の{col_numeric}の推移',
+                                 key="plot_date_category_3val")
 
     return fig
