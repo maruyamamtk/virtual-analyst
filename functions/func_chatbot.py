@@ -15,6 +15,7 @@ from langchain.schema import HumanMessage
 # チャットボットとしての基本機能
 ########################### 
 # メッセージ・コードの実行結果を初期化する関数
+@st.fragment
 def init_messages(clear_conversation):
     if clear_conversation == True or "messages" not in st.session_state:
         st.session_state.messages = []
@@ -22,6 +23,7 @@ def init_messages(clear_conversation):
         st.session_state.execution_results = []
 
 # chatの履歴を格納する関数
+@st.fragment
 def get_chat_history():
     chat_history = []
     start_index = max(0, len(st.session_state.messages)-7) # 直近7回分のやり取りを記憶して回答する
@@ -32,6 +34,7 @@ def get_chat_history():
 ###########################
 # コード生成に使用する関数
 ###########################
+@st.fragment
 def generate_code(analysis_query, summary_flag=False):
     # --- ChatGPTへ送るプロンプトの作成 ---
     prompt_template = """
@@ -71,7 +74,7 @@ def generate_code(analysis_query, summary_flag=False):
             # streamlitの関数を使って、適切に出力・描画をしてください
             # 例: st.write(element)→テキストの場合
             # 例: st.pyplot(element)→グラフを描画する場合
-            print(element)
+            st.pyplot(element)
         ```
     """
 
@@ -103,8 +106,9 @@ def generate_code(analysis_query, summary_flag=False):
     system_message = (
         "あなたは優秀なデータアナリストです。"
         "入力された要件に沿って分析を行うpythonコードを出力してください。"
-        "その際、出力はコードのみとし、その他の説明は含めないようにして下さい。"
-        "分析に使用するデータは常にst.session_state.dfになります。dfにcopy()してから分析を開始してください"
+        "その際、出力はコードのみとし、その他の説明は絶対に含めないで下さい。"
+        "分析に使用するデータは常にst.session_state.dfになります。dfにcopy()してから分析を開始してください。"
+        "また、実行結果はstreamlitで表示させてください。"
     )
     memory.chat_memory.add_message(SystemMessage(content=system_message))
     
@@ -134,6 +138,7 @@ def generate_code(analysis_query, summary_flag=False):
 ###########################
 # 生成したコードを実行する関数
 ###########################
+@st.fragment
 def execute_code(code, user_input):
     python_repl = PythonREPL()
     try:
@@ -152,6 +157,7 @@ def execute_code(code, user_input):
 ###########################
 # 生成したコードにエラーが出た場合に再生成を試みる関数
 ###########################
+@st.fragment
 def re_generate_code(generated_code, result, summary_flag=False):
     prompt_template = """
         下記のコードを実行したところ、後述のエラーが発生しました。
@@ -177,7 +183,7 @@ def re_generate_code(generated_code, result, summary_flag=False):
             # streamlitの関数を使って、適切に出力・描画をしてください
             # 例: st.write(element)→テキストの場合
             # 例: st.pyplot(element)→グラフを描画する場合
-            print(element)
+            st.pyplot(element)
         ```
     """
 
@@ -203,8 +209,9 @@ def re_generate_code(generated_code, result, summary_flag=False):
     system_message = (
         "あなたは優秀なデータアナリストです。"
         "入力された要件に沿って分析を行うpythonコードを出力してください。"
-        "その際、出力はコードのみとし、その他の説明は含めないようにして下さい。"
-        "分析に使用するデータは常にst.session_state.dfになります。dfにcopy()してから分析を開始してください"
+        "その際、出力はコードのみとし、その他の説明は絶対に含めないで下さい。"
+        "分析に使用するデータは常にst.session_state.dfになります。dfにcopy()してから分析を開始してください。"
+        "また、実行結果はstreamlitで表示させてください。"
     )
     memory.chat_memory.add_message(SystemMessage(content=system_message))
     
