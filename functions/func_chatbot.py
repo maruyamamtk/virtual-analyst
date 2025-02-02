@@ -7,15 +7,19 @@ from langchain.chains import LLMChain, ConversationChain
 from langchain_experimental.utilities import PythonREPL
 from langchain.agents import Tool
 from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationSummaryMemory
+from langchain.schema import SystemMessage
 from langchain.schema import HumanMessage
 
 ###########################
 # チャットボットとしての基本機能
 ########################### 
-# メッセージを初期化する関数
+# メッセージ・コードの実行結果を初期化する関数
 def init_messages(clear_conversation):
     if clear_conversation == True or "messages" not in st.session_state:
         st.session_state.messages = []
+    if clear_conversation == True or "execution_results" not in st.session_state:
+        st.session_state.execution_results = []
 
 # chatの履歴を格納する関数
 def get_chat_history():
@@ -28,7 +32,7 @@ def get_chat_history():
 ###########################
 # コード生成に使用する関数
 ###########################
-def generate_code(analysis_query):
+def generate_code(analysis_query, summary_flag=False):
     # --- ChatGPTへ送るプロンプトの作成 ---
     prompt_template = """
         DataFrame 'st.session_state.df' には、以下のカラムが存在します。
@@ -57,6 +61,8 @@ def generate_code(analysis_query):
         import pandas as pd
         import numpy as np
         import streamlit as st
+        # データをdfに読み込む
+        df = st.session_state.df.copy()
         # ここにコードを書く
         result = [] # 出力したい実行結果を格納するリスト。必要なオブジェクトを適宜appendしていく
         
@@ -87,11 +93,22 @@ def generate_code(analysis_query):
         #openai_api_key=st.secrets["OPENAI_API_KEY"]
     )
     
-    # chat履歴をプロンプト実行時に参照する
-    chat_history = get_chat_history()
-    memory = ConversationBufferMemory(memory_key="history", return_messages=True)
-    # st.session_state.messagesの内容をConversationBufferMemoryに反映
-    # langchainの内部では、ユーザー・アシスタントそれぞれのメッセージを個別に追加する必要がある
+    # --- 要約フラグに応じたメモリの設定 ---
+    if summary_flag:
+        memory = ConversationSummaryMemory(llm=llm, memory_key="history", return_messages=True)
+    else:
+        memory = ConversationBufferMemory(memory_key="history", return_messages=True)
+    
+    # --- system向けのプロンプトを追加 ---
+    system_message = (
+        "あなたは優秀なデータアナリストです。"
+        "入力された要件に沿って分析を行うpythonコードを出力してください。"
+        "その際、出力はコードのみとし、その他の説明は含めないようにして下さい。"
+        "分析に使用するデータは常にst.session_state.dfになります。dfにcopy()してから分析を開始してください"
+    )
+    memory.chat_memory.add_message(SystemMessage(content=system_message))
+    
+    # st.session_state.messagesの内容をConversationMemoryに反映
     for message in st.session_state.messages:
         if message['role'] == 'user':
             memory.chat_memory.add_user_message(message['content'])
@@ -100,10 +117,9 @@ def generate_code(analysis_query):
 
     chain = ConversationChain(llm=llm, memory=memory, verbose=True)
 
-
     # プロンプト変数を埋め込んでChatGPTへ問い合わせ
     generated_response = chain.predict(
-        input = prompt_template.format(
+        input=prompt_template.format(
             numeric_columns=st.session_state.numeric_columns,
             non_numeric_columns=st.session_state.non_numeric_columns,
             datetime_columns=st.session_state.datetime_columns,
@@ -113,27 +129,33 @@ def generate_code(analysis_query):
 
     return generated_response
 
+
+
 ###########################
 # 生成したコードを実行する関数
 ###########################
-def execute_code(code):
+def execute_code(code, user_input):
     python_repl = PythonREPL()
     try:
         result = python_repl.run(code)
+        # 結果をセッション状態に保存する(ユーザーの指示と実行結果を交互に保存)
+        st.session_state["execution_results"].append(user_input)
+        st.session_state["execution_results"].append(code) # コードを保存し、それを実行して表示させる
         return result
     except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
         st.error("コードの実行中にエラーが発生しました。再生成を試みます。")
-        st.error("Error:\n" + traceback.format_exc())
-        return traceback.format_exc()
+        st.error("Error:\n" + error_msg)
+        return error_msg
     
 ###########################
 # 生成したコードにエラーが出た場合に再生成を試みる関数
 ###########################
-def re_generate_code(generated_code, result):
+def re_generate_code(generated_code, result, summary_flag=False):
     prompt_template = """
         下記のコードを実行したところ、後述のエラーが発生しました。
         要因を特定し、コードの修正案を出力してください。
-        なお、出力形式はコードのみにしてください。
         # コード
         {code}
         # エラー
@@ -145,6 +167,8 @@ def re_generate_code(generated_code, result):
         import pandas as pd
         import numpy as np
         import streamlit as st
+        # データをdfに読み込む
+        df = st.session_state.df.copy()
         # ここにコードを書く
         result = [] # 出力したい実行結果を格納するリスト。必要なオブジェクトを適宜appendしていく
         
@@ -156,11 +180,9 @@ def re_generate_code(generated_code, result):
             print(element)
         ```
     """
+
     prompt = PromptTemplate(
-        input_variables=[
-            "code",
-            "error"
-        ],
+        input_variables=["code", "error"],
         template=prompt_template
     )
 
@@ -171,7 +193,35 @@ def re_generate_code(generated_code, result):
         #openai_api_key=st.secrets["OPENAI_API_KEY"]
     )
 
-    generated_response = llm([
-        HumanMessage(content=prompt.format(code=generated_code, error=result))
-    ])
-    return generated_response.content
+    # --- 要約フラグに応じたメモリの設定 ---
+    if summary_flag:
+        memory = ConversationSummaryMemory(llm=llm, memory_key="history", return_messages=True)
+    else:
+        memory = ConversationBufferMemory(memory_key="history", return_messages=True)
+    
+    # --- system向けのプロンプトを追加 ---
+    system_message = (
+        "あなたは優秀なデータアナリストです。"
+        "入力された要件に沿って分析を行うpythonコードを出力してください。"
+        "その際、出力はコードのみとし、その他の説明は含めないようにして下さい。"
+        "分析に使用するデータは常にst.session_state.dfになります。dfにcopy()してから分析を開始してください"
+    )
+    memory.chat_memory.add_message(SystemMessage(content=system_message))
+    
+    # st.session_state.messagesの内容をConversationMemoryに反映
+    for message in st.session_state.messages:
+        if message['role'] == 'user':
+            memory.chat_memory.add_user_message(message['content'])
+        elif message['role'] == 'assistant':
+            memory.chat_memory.add_ai_message(message['content'])
+    
+    chain = ConversationChain(llm=llm, memory=memory, verbose=True)
+
+    generated_response = chain.predict(
+        input=prompt_template.format(
+            code=generated_code,
+            error=result
+        )
+    )
+
+    return generated_response
