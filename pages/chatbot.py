@@ -97,7 +97,11 @@ tab_list = st.tabs(tab_names)
 with tab_list[0]:
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            # コードが見やすいようにcode関数で表示させる
+            if message["role"] == "assistant":
+                st.code(message["content"])
+            else:
+                st.write(message["content"])
 
     # ユーザーからの入力を受け付ける
     if user_input := st.chat_input("分析内容を入力してください"):
@@ -117,12 +121,6 @@ with tab_list[0]:
             st.info("生成されたコードを実行中…")
             result = fc.execute_code(generated_code, user_input)
             st.session_state.messages.append({"role": "assistant", "content": result})
-            with st.chat_message("assistant"):
-                st.write("**コードの実行結果:**")
-                try:
-                    st.code(result)
-                except:
-                    st.write(result)
 
             # エラーが出た場合、リトライ処理を実施する
             attempt = 1
@@ -147,12 +145,6 @@ with tab_list[0]:
                 st.info("生成されたコードを実行中…")
                 result = fc.execute_code(generated_code, user_input_error)
                 st.session_state.messages.append({"role": "assistant", "content": result})
-                with st.chat_message("assistant"):
-                    st.write("**コードの実行結果:**")
-                    try:
-                        st.code(result)
-                    except:
-                        st.write(result)
 
                 attempt += 1
 
@@ -196,7 +188,7 @@ with tab_list[1]:
                     # 次の偶数番の結果が存在する場合は合わせて表示
                     if i + 1 < len(execution_results):
                         st.write("**実行結果**")
-                        st.write(execution_results[i + 1])
+                        st.code(execution_results[i + 1])
                         # 重い処理部分は関数 run_heavy_code に任せる（※st.fragment により再実行されません）
                         run_heavy_code(execution_results[i + 1])
                 st.markdown("</div>", unsafe_allow_html=True)

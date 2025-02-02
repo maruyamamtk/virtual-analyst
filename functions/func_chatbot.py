@@ -9,7 +9,8 @@ from langchain.agents import Tool
 from langchain.memory import ConversationBufferMemory
 from langchain.memory import ConversationSummaryMemory
 from langchain.schema import SystemMessage
-from langchain.schema import HumanMessage
+from langchain.schema import HumanMessage, OutputParserException
+from langchain.output_parsers import RegexParser
 
 ###########################
 # チャットボットとしての基本機能
@@ -30,6 +31,7 @@ def get_chat_history():
     for i in range(start_index, len(st.session_state.messages)-1):
         chat_history.append(st.session_state.messages[i])
     return chat_history
+
 
 ###########################
 # コード生成に使用する関数
@@ -58,7 +60,7 @@ def generate_code(analysis_query, summary_flag=False):
           - numpy
           - scikit-learn
           - statsmodels
-        - 以下の形式でコードのみ出力してください:
+        - コードの中身についての指定
         ```
         # 必要なライブラリは追加でimportしてください
         import pandas as pd
@@ -87,10 +89,26 @@ def generate_code(analysis_query, summary_flag=False):
         ],
         template=prompt_template
     )
+    
+    # パーサーが指定する出力フォーマットの指示を取得
+    format_instructions = (
+        "以下のフォーマットに従って、回答を出力してください。\n"
+        "必ず python のコードのみを返し、コード以外の説明は入れないでください。\n"
+        "出力形式:\n"
+        "```python\n<生成されたコード>\n```"
+    )
+    # --- プロンプトに変数を埋め込み、フォーマット指示を追加 ---
+    filled_prompt = prompt.format(
+        numeric_columns=st.session_state.numeric_columns,
+        non_numeric_columns=st.session_state.non_numeric_columns,
+        datetime_columns=st.session_state.datetime_columns,
+        analysis_query=analysis_query
+    )
+    full_prompt = filled_prompt + "\n\n" + format_instructions
 
-    # --- LangChainのChatOpenAIを利用 ---
+    # --- LangChainのChatOpenAI を利用 ---
     llm = ChatOpenAI(
-        temperature=0, 
+        temperature=0,
         model_name="gpt-4",
         openai_api_key="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"
         #openai_api_key=st.secrets["OPENAI_API_KEY"]
@@ -112,27 +130,30 @@ def generate_code(analysis_query, summary_flag=False):
     )
     memory.chat_memory.add_message(SystemMessage(content=system_message))
     
-    # st.session_state.messagesの内容をConversationMemoryに反映
+    # st.session_state.messages の内容を ConversationMemory に反映
     for message in st.session_state.messages:
         if message['role'] == 'user':
             memory.chat_memory.add_user_message(message['content'])
         elif message['role'] == 'assistant':
             memory.chat_memory.add_ai_message(message['content'])
-
+    
+    # --- ConversationChain の作成 ---
     chain = ConversationChain(llm=llm, memory=memory, verbose=True)
-
-    # プロンプト変数を埋め込んでChatGPTへ問い合わせ
-    generated_response = chain.predict(
-        input=prompt_template.format(
-            numeric_columns=st.session_state.numeric_columns,
-            non_numeric_columns=st.session_state.non_numeric_columns,
-            datetime_columns=st.session_state.datetime_columns,
-            analysis_query=analysis_query
-        )
+    # --- ChatGPT へ問い合わせ ---
+    generated_response = chain.predict(input=full_prompt)
+    # --- LLM の出力からコード部分のみを抽出 ---
+    # RegexParser の定義（コードブロックの中身を抽出）
+    parser = RegexParser(
+        # 「```python」と「```」があってもなくてもコード部分をキャプチャする正規表現
+        regex=r"^(?:```python\s*)?([\s\S]*?)(?:\s*```)?\s*$",
+        output_keys=["code"]
     )
-
-    return generated_response
-
+    try:
+        parsed_output = parser.parse(generated_response)
+        return parsed_output["code"]
+    except OutputParserException as e:
+        # パースに失敗した場合は、出力全体をコードとみなして返す
+        return generated_response.strip()
 
 
 ###########################
@@ -166,8 +187,7 @@ def re_generate_code(generated_code, result, summary_flag=False):
         {code}
         # エラー
         {error}
-        # 出力形式
-        - 以下の形式でコードのみ出力してください:
+        # コードの中身についての指定
         ```
         # 必要なライブラリは追加でimportしてください
         import pandas as pd
@@ -191,6 +211,19 @@ def re_generate_code(generated_code, result, summary_flag=False):
         input_variables=["code", "error"],
         template=prompt_template
     )
+    # パーサーが指定する出力フォーマットの指示を取得
+    format_instructions = (
+        "以下のフォーマットに従って、回答を出力してください。\n"
+        "必ず python のコードのみを返し、コード以外の説明は入れないでください。\n"
+        "出力形式:\n"
+        "```python\n<生成されたコード>\n```"
+    )
+    # --- プロンプトに変数を埋め込み、フォーマット指示を追加 ---
+    filled_prompt = prompt.format(
+            code=generated_code,
+            error=result
+    )
+    full_prompt = filled_prompt + "\n\n" + format_instructions
 
     llm = ChatOpenAI(
         temperature=0, 
@@ -223,12 +256,18 @@ def re_generate_code(generated_code, result, summary_flag=False):
             memory.chat_memory.add_ai_message(message['content'])
     
     chain = ConversationChain(llm=llm, memory=memory, verbose=True)
-
-    generated_response = chain.predict(
-        input=prompt_template.format(
-            code=generated_code,
-            error=result
-        )
+    # --- ChatGPT へ問い合わせ ---
+    generated_response = chain.predict(input=full_prompt)
+    # --- LLM の出力からコード部分のみを抽出 ---
+    # RegexParser の定義（コードブロックの中身を抽出）
+    parser = RegexParser(
+        # 「```python」と「```」があってもなくてもコード部分をキャプチャする正規表現
+        regex=r"^(?:```python\s*)?([\s\S]*?)(?:\s*```)?\s*$",
+        output_keys=["code"]
     )
-
-    return generated_response
+    try:
+        parsed_output = parser.parse(generated_response)
+        return parsed_output["code"]
+    except OutputParserException as e:
+        # パースに失敗した場合は、出力全体をコードとみなして返す
+        return generated_response.strip()
