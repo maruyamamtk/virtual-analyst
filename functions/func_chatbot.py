@@ -1,5 +1,6 @@
 import streamlit as st 
 import traceback
+import ast
 # LangChainとOpenAI関連のインポート
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
@@ -36,6 +37,19 @@ def get_chat_history():
 ###########################
 # コード生成に使用する関数
 ###########################
+# 生成されたコードが parsed_output にテキストとして格納されている場合に追加対応を行う関数
+def remove_surrounding_quotes_if_needed(parsed_output: str) -> str:
+    # ast.literal_eval でパースできる（= 有効な文字列リテラル）か試す
+    try:
+        # もし先頭と末尾がダブルクォートやシングルクォートで囲まれた文字列なら
+        # ここで実際の文字列(例: import pandas as pd\n...)に変換される
+        code_str = ast.literal_eval(parsed_output)
+        # 変換できたら、それを返す
+        return code_str
+    except (SyntaxError, ValueError):
+        # もしパースできなかった場合は、もともとの文字列をそのまま返す
+        return parsed_output
+
 @st.fragment
 def generate_code(analysis_query, summary_flag=False):
     # --- ChatGPTへ送るプロンプトの作成 ---
@@ -60,7 +74,7 @@ def generate_code(analysis_query, summary_flag=False):
           - numpy
           - scikit-learn
           - statsmodels
-        - コードの中身についての指定
+        - コードの出力形式の指定
         ```
         # 必要なライブラリは追加でimportしてください
         import pandas as pd
@@ -150,9 +164,10 @@ def generate_code(analysis_query, summary_flag=False):
     )
     try:
         parsed_output = parser.parse(generated_response)
+        parsed_output["code"] = remove_surrounding_quotes_if_needed(parsed_output["code"])
         return parsed_output["code"]
     except OutputParserException as e:
-        # パースに失敗した場合は、出力全体をコードとみなして返す
+        generated_response = remove_surrounding_quotes_if_needed(generated_response)
         return generated_response.strip()
 
 
@@ -187,7 +202,7 @@ def re_generate_code(generated_code, result, summary_flag=False):
         {code}
         # エラー
         {error}
-        # コードの中身についての指定
+        # コードの出力形式の指定
         ```
         # 必要なライブラリは追加でimportしてください
         import pandas as pd
@@ -267,7 +282,8 @@ def re_generate_code(generated_code, result, summary_flag=False):
     )
     try:
         parsed_output = parser.parse(generated_response)
+        parsed_output["code"] = remove_surrounding_quotes_if_needed(parsed_output["code"])
         return parsed_output["code"]
     except OutputParserException as e:
-        # パースに失敗した場合は、出力全体をコードとみなして返す
+        generated_response = remove_surrounding_quotes_if_needed(generated_response)
         return generated_response.strip()

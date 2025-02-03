@@ -121,6 +121,9 @@ with tab_list[0]:
             st.info("生成されたコードを実行中…")
             result = fc.execute_code(generated_code, user_input)
             st.session_state.messages.append({"role": "assistant", "content": result})
+            with st.chat_message("assistant"):
+                st.write("**実行結果:**")
+                st.code(result, language="python")
 
             # エラーが出た場合、リトライ処理を実施する
             attempt = 1
@@ -145,6 +148,9 @@ with tab_list[0]:
                 st.info("生成されたコードを実行中…")
                 result = fc.execute_code(generated_code, user_input_error)
                 st.session_state.messages.append({"role": "assistant", "content": result})
+                with st.chat_message("assistant"):
+                    st.write("**実行結果:**")
+                    st.code(result, language="python")
 
                 attempt += 1
 
