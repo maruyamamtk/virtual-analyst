@@ -1,5 +1,6 @@
 import streamlit as st
 from functions.multi_pages import multi_page
+from functions.func_chatbot import use_secret
  
 # 環境変数が設定されていない場合、以下のコマンドを実行する必要がある
 # python -m streamlit run .\streamlit_app.py
@@ -18,6 +19,11 @@ st.set_page_config(
 # サイドバーの設定
 ###########################
 multi_page()
+
+###########################
+# ChatGPTのAPIを呼び出す
+###########################
+use_secret()
 
 ###########################
 # コンテンツ

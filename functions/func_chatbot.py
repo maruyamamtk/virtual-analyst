@@ -14,6 +14,12 @@ from langchain.schema import HumanMessage, OutputParserException
 from langchain.output_parsers import RegexParser
 
 ###########################
+# APIの取得
+########################### 
+def use_secret():
+    api_key = st.secrets["OPENAI_API_KEY"]
+
+###########################
 # チャットボットとしての基本機能
 ########################### 
 # メッセージ・コードの実行結果を初期化する関数
