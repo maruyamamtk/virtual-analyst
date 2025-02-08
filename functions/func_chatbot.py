@@ -210,8 +210,7 @@ def generate_code(analysis_query, summary_flag=False):
     llm = ChatOpenAI(
         temperature=0,
         model_name="gpt-4",
-        openai_api_key="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"
-        #openai_api_key=st.secrets["OPENAI_API_KEY"]
+        openai_api_key=st.secrets["OPENAI_API_KEY"]
     )
     
     # --- 要約フラグに応じたメモリの設定 ---
@@ -331,8 +330,7 @@ def re_generate_code(generated_code, result, summary_flag=False):
     llm = ChatOpenAI(
         temperature=0, 
         model_name="gpt-4",
-        openai_api_key="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"
-        #openai_api_key=st.secrets["OPENAI_API_KEY"]
+        openai_api_key=st.secrets["OPENAI_API_KEY"]
     )
 
     # --- 要約フラグに応じたメモリの設定 ---
