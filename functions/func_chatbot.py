@@ -3,7 +3,7 @@ import traceback
 import ast
 # LangChainとOpenAI関連のインポート
 from langchain.chat_models import ChatOpenAI
-from langchain.prompts import PromptTemplate
+from langchain.prompts import PromptTemplate, FewShotPromptTemplate
 from langchain.chains import LLMChain, ConversationChain
 from langchain_experimental.utilities import PythonREPL
 from langchain.agents import Tool
@@ -52,8 +52,93 @@ def remove_surrounding_quotes_if_needed(parsed_output: str) -> str:
 
 @st.fragment
 def generate_code(analysis_query, summary_flag=False):
-    # --- ChatGPTへ送るプロンプトの作成 ---
-    prompt_template = """
+    # --- Few-shot で与える入出力例の定義 ---
+    examples = [
+        {
+            "analysis_query": "累積の売り上げ金額がtop10のユーザーを抽出し、その課金額を集計してください",
+            "code": (
+               """
+                import pandas as pd
+                import numpy as np
+                import streamlit as st
+
+                df = st.session_state.df.copy()
+
+                # 売り上げ金額を計算
+                df['Sales'] = df['Quantity'] * df['Unit_Price']
+
+                # ユーザーごとの累積売り上げ金額を計算
+                user_sales = df.groupby('Customer_ID')['Sales'].sum().sort_values(ascending=False)
+
+                # 売り上げ金額がtop10のユーザーを抽出
+                top10_users = user_sales.head(10)
+
+                result = [top10_users]
+
+                for element in result:
+                    st.write(element)
+               """
+            )
+        },
+        {
+            "analysis_query": "累積の売り上げ金額がtop10のユーザーを抽出し、該当ユーザーの月次の売上推移を折れ線グラフで可視化してください。",
+            "code": (
+                """
+                import pandas as pd
+                import numpy as np
+                import streamlit as st
+                import matplotlib.pyplot as plt
+
+                df = st.session_state.df.copy()
+
+                # 売り上げ金額を計算
+                df['Sales'] = df['Quantity'] * df['Unit_Price']
+
+                # ユーザーごとの累積売り上げ金額を計算
+                user_sales = df.groupby('Customer_ID')['Sales'].sum().sort_values(ascending=False)
+
+                # 売り上げ金額がtop10のユーザーを抽出
+                top10_users = user_sales.head(10)
+
+                # 該当ユーザーの月次の売上推移を計算
+                df['Invoice_Month'] = df['Invoice_Date'].dt.to_period('M')
+                monthly_sales = df[df['Customer_ID'].isin(top10_users.index)].groupby(['Invoice_Month', 'Customer_ID'])['Sales'].sum().unstack()
+
+                # 折れ線グラフで可視化
+                fig, ax = plt.subplots(figsize=(10, 6))
+                monthly_sales.plot(ax=ax)
+                plt.title('Monthly Sales Trend of Top 10 Users')
+                plt.xlabel('Month')
+                plt.ylabel('Sales')
+                plt.legend(title='Customer ID', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+                result = [top10_users, fig]
+
+                for element in result:
+                    if isinstance(element, pd.DataFrame) or isinstance(element, pd.Series):
+                        st.write(element)
+                    else:
+                        st.pyplot(element)
+                """
+            )
+        }
+    ]
+
+    # --- 各入出力例のフォーマット定義 ---
+    example_prompt = PromptTemplate(
+        input_variables=["analysis_query", "code"],
+        template="""
+                【分析要求の例】
+                {analysis_query}
+
+                【生成されたコードの例】
+                ```python
+                {code}
+                """
+    )
+
+    # --- Few-shot プロンプト全体の構成 ---
+    prefix = """
         DataFrame 'st.session_state.df' には、以下のカラムが存在します。
 
         - 数値型カラム: {numeric_columns}
@@ -61,11 +146,12 @@ def generate_code(analysis_query, summary_flag=False):
         - 日付型カラム: {datetime_columns}
 
         上記の前提で、後述の要件を満たすPythonのコードを作成してください。
-        # ユーザーからの分析要求
-        -----------------------
-        {analysis_query}
-        -----------------------
-        # 詳細な要件
+
+        # **入出力の例**
+    """
+
+    suffix = """
+        # **要件の詳細**
         - 過去に実行したコードがある場合は、そのコードをベースに書き換えを実施してください
         - 分析結果の解釈に必要な数値やグラフは漏れが無いように出力してください。
         - 加工するDataFrameは変数 `st.session_state.df` であり、結果は変数 `result` に格納するものとします。  
@@ -94,29 +180,29 @@ def generate_code(analysis_query, summary_flag=False):
         ```
     """
 
-    prompt = PromptTemplate(
-        input_variables=[
-            "numeric_columns",
-            "non_numeric_columns",
-            "datetime_columns",
-            "analysis_query"
-        ],
-        template=prompt_template
+    few_shot_prompt = FewShotPromptTemplate(
+        examples=examples,
+        example_prompt=example_prompt,
+        prefix=prefix,
+        suffix=suffix,
+        example_separator="\n\n",
+        input_variables=["numeric_columns", "non_numeric_columns", "datetime_columns", "analysis_query"]
     )
     
+    # --- プロンプトに変数を埋め込み、フォーマット指示を追加 ---
+    filled_prompt = few_shot_prompt.format(
+        numeric_columns=st.session_state.numeric_columns,
+        non_numeric_columns=st.session_state.non_numeric_columns,
+        datetime_columns=st.session_state.datetime_columns,
+        analysis_query=analysis_query
+    )
+
     # パーサーが指定する出力フォーマットの指示を取得
     format_instructions = (
         "以下のフォーマットに従って、回答を出力してください。\n"
         "必ず python のコードのみを返し、コード以外の説明は入れないでください。\n"
         "出力形式:\n"
         "```python\n<生成されたコード>\n```"
-    )
-    # --- プロンプトに変数を埋め込み、フォーマット指示を追加 ---
-    filled_prompt = prompt.format(
-        numeric_columns=st.session_state.numeric_columns,
-        non_numeric_columns=st.session_state.non_numeric_columns,
-        datetime_columns=st.session_state.datetime_columns,
-        analysis_query=analysis_query
     )
     full_prompt = filled_prompt + "\n\n" + format_instructions
 
@@ -185,10 +271,12 @@ def execute_code(code, user_input):
         return result
     except Exception as e:
         import traceback
-        error_msg = traceback.format_exc()
+        # TracebackException を使って、例外チェーンなど詳細な情報を取得する
+        tb_exception = traceback.TracebackException.from_exception(e)
+        detailed_error_trace = ''.join(tb_exception.format(chain=True))
         st.error("コードの実行中にエラーが発生しました。再生成を試みます。")
-        st.error("Error:\n" + error_msg)
-        return error_msg
+        st.error("Error:\n" +  detailed_error_trace)
+        return  detailed_error_trace
     
 ###########################
 # 生成したコードにエラーが出た場合に再生成を試みる関数
